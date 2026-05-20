@@ -1,0 +1,17 @@
+POST http://localhost:8080/api/users
+Content-Type: application/json
+
+{
+  "firstName": "Kushalini",
+  "lastName": "Karthi",
+  "email": "kushalini@gmail.com",
+  "phone": "0712345678",
+  "role": "CUSTOMER",
+  "address": {
+    "street": "Main Street",
+    "city": "Colombo",
+    "state": "Western",
+    "country": "Sri Lanka",
+    "zipcode": "01000"
+  }
+}
