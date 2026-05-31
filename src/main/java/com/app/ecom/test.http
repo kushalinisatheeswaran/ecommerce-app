@@ -1,17 +1,11 @@
-POST http://localhost:8080/api/users
+POST http://localhost:8080/api/products
 Content-Type: application/json
 
 {
-  "firstName": "Kushalini",
-  "lastName": "Karthi",
-  "email": "kushalini@gmail.com",
-  "phone": "0712345678",
-  "role": "CUSTOMER",
-  "address": {
-    "street": "Main Street",
-    "city": "Colombo",
-    "state": "Western",
-    "country": "Sri Lanka",
-    "zipcode": "01000"
-  }
+  "name": "iPhone 15",
+  "description": "Latest Apple phone",
+  "price": 1200.00,
+  "stockQuantity": 10,
+  "category": "Electronics",
+  "imageUrl": "https://example.com/iphone.jpg"
 }
