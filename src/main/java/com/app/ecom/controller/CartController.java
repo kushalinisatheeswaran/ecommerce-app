@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.validation.Valid;
 import java.util.List;
 
 @RestController
@@ -16,13 +17,15 @@ import java.util.List;
 public class CartController {
 
     private final CartService cartService;
+    private final com.app.ecom.security.IdentityResolver identityResolver;
 
     @PostMapping
     public ResponseEntity<String> addToCart(
-            @RequestHeader("x-user-id") String userId,
-            @RequestBody CartItemRequest request) {
+            @RequestHeader(value = "x-user-id", required = false) String userId,
+            @RequestBody @Valid CartItemRequest request) {
 
-        boolean added = cartService.addCart(userId, request);
+        String resolvedUserId = identityResolver.resolveUserId(userId);
+        boolean added = cartService.addCart(resolvedUserId, request);
 
         if (!added) {
             return ResponseEntity.badRequest()
@@ -34,10 +37,11 @@ public class CartController {
 
     @DeleteMapping("/items/{productId}")
     public ResponseEntity<Void> removeFromCart(
-            @RequestHeader("x-user-id") String userId,
+            @RequestHeader(value = "x-user-id", required = false) String userId,
             @PathVariable Long productId) {
 
-        boolean deleted = cartService.deleteItemFromCart(userId, productId);
+        String resolvedUserId = identityResolver.resolveUserId(userId);
+        boolean deleted = cartService.deleteItemFromCart(resolvedUserId, productId);
 
         return deleted
                 ? ResponseEntity.noContent().build()
@@ -46,9 +50,10 @@ public class CartController {
 
     @GetMapping
     public ResponseEntity<List<CartItem>> getCart(
-            @RequestHeader("x-user-id") String userId) {
+            @RequestHeader(value = "x-user-id", required = false) String userId) {
 
-        List<CartItem> cartItems = cartService.getCart(userId);
+        String resolvedUserId = identityResolver.resolveUserId(userId);
+        List<CartItem> cartItems = cartService.getCart(resolvedUserId);
         return ResponseEntity.ok(cartItems);
     }
 }

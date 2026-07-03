@@ -17,6 +17,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class UserService {
     private  final UserRepository userRepository;
+    private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
     //private List<User> userList = new ArrayList<>();
     private Long nextId = 1L;
 
@@ -27,11 +28,11 @@ public class UserService {
               .collect(Collectors.toList());
     }
 
-    public void addUser(UserRequest userRequest) {
-//        user.setId(nextId++);
-        User user =new User();
-        updateUserFromRequest(user,userRequest);
-        userRepository.save(user);
+    public UserResponse addUser(UserRequest userRequest) {
+        User user = new User();
+        updateUserFromRequest(user, userRequest);
+        User savedUser = userRepository.save(user);
+        return mapToUserResponse(savedUser);
     }
 
     private void updateUserFromRequest(User user, UserRequest userRequest) {
@@ -39,6 +40,9 @@ public class UserService {
         user.setLastName(userRequest.getLastName());
         user.setEmail(userRequest.getEmail());
         user.setPhone(userRequest.getPhone());
+        if (userRequest.getPassword() != null) {
+            user.setPassword(passwordEncoder.encode(userRequest.getPassword()));
+        }
 
         if(userRequest.getAddress() !=null){
             Address address =new Address();

@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.validation.Valid;
 import java.util.List;
 
 @RestController
@@ -29,7 +30,7 @@ public class UserController {
     }
 
     @PostMapping
-    public ResponseEntity<String> createUser(@RequestBody UserRequest userRequest) {
+    public ResponseEntity<String> createUser(@RequestBody @Valid UserRequest userRequest) {
         userService.addUser(userRequest);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body("User added successfully");
@@ -37,7 +38,7 @@ public class UserController {
 
     @PutMapping("/{id}")
     public ResponseEntity<String> updateUser(@PathVariable Long id,
-                                             @RequestBody UserRequest updatedUserRequest) {
+                                             @RequestBody @Valid UserRequest updatedUserRequest) {
        boolean updated = userService.updateUser(id,updatedUserRequest);
        if(updated)
            return ResponseEntity.ok("user updated succesfully");

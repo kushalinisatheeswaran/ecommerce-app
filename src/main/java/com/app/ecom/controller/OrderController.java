@@ -13,12 +13,14 @@ import org.springframework.web.bind.annotation.*;
 public class OrderController {
 
     private final OrderService orderService;
+    private final com.app.ecom.security.IdentityResolver identityResolver;
 
     @PostMapping
     public ResponseEntity<OrderResponse> createOrder(
-            @RequestHeader("x-user-Id") String userId) {
+            @RequestHeader(value = "x-user-Id", required = false) String userId) {
 
-        return orderService.createOrder(userId)
+        String resolvedUserId = identityResolver.resolveUserId(userId);
+        return orderService.createOrder(resolvedUserId)
                 .map(orderResponse ->
                         new ResponseEntity<>(orderResponse, HttpStatus.CREATED)
                 )

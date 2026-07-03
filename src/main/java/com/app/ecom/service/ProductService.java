@@ -61,15 +61,14 @@ public class ProductService {
                     Product savedProduct = productRepository.save(existingProduct);
                     return mapToProductResponse(savedProduct);
                 })
-                .orElseThrow(() -> new RuntimeException("Product not found: " + id));
+                .orElseThrow(() -> new com.app.ecom.exception.ResourceNotFoundException("Product not found: " + id));
 
         return response;
     }
 
-    public List<ProductResponse> getAllProducts() {
-        return productRepository.findByActiveTrue().stream()
-                .map(this::mapToProductResponse)
-                .collect(Collectors.toList());
+    public org.springframework.data.domain.Page<ProductResponse> getAllProducts(org.springframework.data.domain.Pageable pageable) {
+        return productRepository.findByActiveTrue(pageable)
+                .map(this::mapToProductResponse);
     }
 
     public boolean deleteProduct(Long id) {

@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.validation.Valid;
 import java.util.List;
 
 @RestController
@@ -19,20 +20,21 @@ public class ProductController {
 
     @PostMapping
     public ResponseEntity<ProductResponse> createProduct(
-            @RequestBody ProductRequest productRequest) {
+            @RequestBody @Valid ProductRequest productRequest) {
 
         ProductResponse response = productService.createProduct(productRequest);
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
     @GetMapping
-    public ResponseEntity<List<ProductResponse>>getProduct() {
-      return ResponseEntity.ok(productService.getAllProducts());
+    public ResponseEntity<org.springframework.data.domain.Page<ProductResponse>> getProduct(
+            org.springframework.data.domain.Pageable pageable) {
+      return ResponseEntity.ok(productService.getAllProducts(pageable));
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<ProductResponse> updateProduct(
             @PathVariable Long id,
-            @RequestBody ProductRequest productRequest) {
+            @RequestBody @Valid ProductRequest productRequest) {
 
         ProductResponse response = productService.updateProduct(id, productRequest);
         return ResponseEntity.ok(response);
