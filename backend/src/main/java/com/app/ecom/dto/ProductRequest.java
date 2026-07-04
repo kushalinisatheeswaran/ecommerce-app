@@ -27,5 +27,8 @@ public class ProductRequest {
     @NotBlank(message = "Category is required")
     private String category;
 
+    @NotBlank(message = "Image URL is required")
     private String imageUrl;
+
+    private Boolean active;
 }

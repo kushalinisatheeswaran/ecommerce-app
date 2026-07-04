@@ -23,7 +23,11 @@ public class AdminProductService {
     public ProductResponse createProduct(ProductRequest request) {
         Product product = new Product();
         updateProductFields(product, request);
-        product.setActive(true);
+        if (request.getActive() != null) {
+            product.setActive(request.getActive());
+        } else {
+            product.setActive(true);
+        }
         Product savedProduct = productRepository.save(product);
         return mapToProductResponse(savedProduct);
     }
@@ -55,6 +59,9 @@ public class AdminProductService {
         product.setStockQuantity(request.getStockQuantity());
         product.setCategory(request.getCategory());
         product.setImageUrl(request.getImageUrl());
+        if (request.getActive() != null) {
+            product.setActive(request.getActive());
+        }
     }
 
     private ProductResponse mapToProductResponse(Product product) {
