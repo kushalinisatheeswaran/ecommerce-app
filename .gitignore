@@ -4,6 +4,21 @@ target/
 !**/src/main/**/target/
 !**/src/test/**/target/
 
+# --- Frontend Ignores ---
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+
+# --- Backend Ignores ---
+HELP.md
+backend/target/
+target/
+.mvn/wrapper/maven-wrapper.jar
+
 ### STS ###
 .apt_generated
 .classpath
@@ -26,11 +41,10 @@ target/
 /nbdist/
 /.nb-gradle/
 build/
-!**/src/main/**/build/
-!**/src/test/**/build/
 
 ### VS Code ###
 .vscode/
 
 # Local developer configuration
 src/main/resources/application-local.properties
+backend/src/main/resources/application-local.properties
