@@ -1,0 +1,23 @@
+# Stage 1: Build Stage
+FROM maven:3.9.8-eclipse-temurin-21 AS builder
+WORKDIR /app
+
+# Copy Maven dependency file and source directory
+COPY pom.xml .
+COPY src ./src
+
+# Build production executable JAR
+RUN mvn clean package -DskipTests
+
+# Stage 2: Minimal Runtime Stage
+FROM eclipse-temurin:21-jre-alpine
+WORKDIR /app
+
+# Copy compiled Spring Boot executable JAR from build stage
+COPY --from=builder /app/target/ecom-application-0.0.1-SNAPSHOT.jar app.jar
+
+# Expose container listening port (Vercel overrides PORT dynamically)
+EXPOSE 8081
+
+# Launch the Spring Boot application
+ENTRYPOINT ["java", "-jar", "app.jar"]
