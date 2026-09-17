@@ -16,9 +16,11 @@ import java.util.function.Function;
 @Service
 public class JwtService {
 
-    // 256-bit hex encoded key
-    private static final String SECRET_KEY = "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970";
+    @org.springframework.beans.factory.annotation.Value("${jwt.secret:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}")
+    private String secretKey;
+
     private static final long EXPIRATION_TIME = 86400000; // 24 hours in milliseconds
+
 
     public String extractUsername(String token) {
         return extractClaim(token, Claims::getSubject);
@@ -65,7 +67,7 @@ public class JwtService {
     }
 
     private SecretKey getSigningKey() {
-        byte[] keyBytes = Decoders.BASE64URL.decode(SECRET_KEY);
+        byte[] keyBytes = Decoders.BASE64URL.decode(secretKey);
         return Keys.hmacShaKeyFor(keyBytes);
     }
 }
