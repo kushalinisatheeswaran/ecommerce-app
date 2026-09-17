@@ -1,8 +1,8 @@
 import api from './api';
 
 export const orderService = {
-  createOrder: async () => {
-    const response = await api.post('/api/orders');
+  createOrder: async (orderData) => {
+    const response = await api.post('/api/orders', orderData);
     return response.data;
   },
 
@@ -10,5 +10,9 @@ export const orderService = {
     const response = await api.get('/api/orders');
     return response.data;
   },
-};
 
+  getCurrentUser: async () => {
+    const response = await api.get('/api/users/me');
+    return response.data;
+  },
+};

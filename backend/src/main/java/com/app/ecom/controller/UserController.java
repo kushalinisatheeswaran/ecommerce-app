@@ -2,6 +2,7 @@ package com.app.ecom.controller;
 
 import com.app.ecom.dto.UserRequest;
 import com.app.ecom.dto.UserResponse;
+import com.app.ecom.security.IdentityResolver;
 import com.app.ecom.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -17,16 +18,27 @@ import java.util.List;
 public class UserController {
 
     private final UserService userService;
+    private final IdentityResolver identityResolver;
+
+    @GetMapping("/me")
+    public ResponseEntity<UserResponse> getCurrentUser(
+            @RequestHeader(value = "x-user-id", required = false) String userIdHeader) {
+        String userIdStr = identityResolver.resolveUserId(userIdHeader);
+        Long userId = Long.valueOf(userIdStr);
+        return userService.fetchUser(userId)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
 
     @GetMapping
     public ResponseEntity<List<UserResponse>> getAllUsers() {
-        return new ResponseEntity<>(userService.fetchAllUsers(),HttpStatus.OK);
+        return new ResponseEntity<>(userService.fetchAllUsers(), HttpStatus.OK);
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<UserResponse> getUserById(@PathVariable Long id) {
        return userService.fetchUser(id).map(ResponseEntity::ok)
-               .orElseGet(()-> ResponseEntity.notFound().build());
+               .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @PostMapping
@@ -39,9 +51,9 @@ public class UserController {
     @PutMapping("/{id}")
     public ResponseEntity<String> updateUser(@PathVariable Long id,
                                              @RequestBody @Valid UserRequest updatedUserRequest) {
-       boolean updated = userService.updateUser(id,updatedUserRequest);
+       boolean updated = userService.updateUser(id, updatedUserRequest);
        if(updated)
-           return ResponseEntity.ok("user updated succesfully");
+           return ResponseEntity.ok("User updated successfully");
        return ResponseEntity.notFound().build();
     }
 }

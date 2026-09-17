@@ -23,9 +23,29 @@ public class Order {
     @JoinColumn(name = "user_id",nullable = false)
     private User user;
     private BigDecimal totalAmount;
+    private BigDecimal subtotal;
+    private BigDecimal discountAmount;
+    private BigDecimal deliveryFee;
+    private BigDecimal codFee;
 
     @Enumerated(EnumType.STRING)
-    private OrderStatus status=OrderStatus.PENDING;
+    private PaymentMethod paymentMethod;
+
+    @Enumerated(EnumType.STRING)
+    private PaymentStatus paymentStatus;
+
+    private String cardLast4;
+
+    private String shippingFullName;
+    private String shippingPhone;
+    private String shippingStreet;
+    private String shippingCity;
+    private String shippingState;
+    private String shippingZipcode;
+    private String shippingCountry;
+
+    @Enumerated(EnumType.STRING)
+    private OrderStatus status = OrderStatus.PENDING;
 
     @OneToMany(mappedBy = "order",cascade = CascadeType.ALL,orphanRemoval = true)
     private List<OrderItem> items =new ArrayList<>();

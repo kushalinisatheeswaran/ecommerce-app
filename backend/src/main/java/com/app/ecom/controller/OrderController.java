@@ -1,7 +1,9 @@
 package com.app.ecom.controller;
 
+import com.app.ecom.dto.OrderRequest;
 import com.app.ecom.dto.OrderResponse;
 import com.app.ecom.service.OrderService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -19,10 +21,11 @@ public class OrderController {
 
     @PostMapping
     public ResponseEntity<OrderResponse> createOrder(
-            @RequestHeader(value = "x-user-Id", required = false) String userId) {
+            @RequestHeader(value = "x-user-Id", required = false) String userId,
+            @RequestBody @Valid OrderRequest request) {
 
         String resolvedUserId = identityResolver.resolveUserId(userId);
-        return orderService.createOrder(resolvedUserId)
+        return orderService.createOrder(resolvedUserId, request)
                 .map(orderResponse ->
                         new ResponseEntity<>(orderResponse, HttpStatus.CREATED)
                 )
@@ -39,4 +42,4 @@ public class OrderController {
         List<OrderResponse> orders = orderService.getOrdersForUser(resolvedUserId);
         return ResponseEntity.ok(orders);
     }
-}
+}
