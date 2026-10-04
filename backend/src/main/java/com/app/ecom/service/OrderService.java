@@ -28,7 +28,7 @@ public class OrderService {
 
     public Optional<OrderResponse> createOrder(String userId, OrderRequest request) {
 
-        List<CartItem> cartItems = cartService.getCart(userId);
+        List<CartItem> cartItems = cartService.getCartEntities(userId);
 
         if (cartItems.isEmpty()) {
             throw new BadRequestException("Cannot create an order with an empty cart.");
@@ -100,13 +100,17 @@ public class OrderService {
         order.setShippingCountry(request.getCountry());
 
         List<OrderItem> orderItems = cartItems.stream()
-                .map(item -> new OrderItem(
-                        null,
-                        item.getProduct(),
-                        item.getQuantity(),
-                        item.getPrice(),
-                        order
-                ))
+                .map(item -> {
+                    BigDecimal unitPrice = item.getProduct().getPrice();
+                    BigDecimal lineTotal = unitPrice.multiply(BigDecimal.valueOf(item.getQuantity()));
+                    return OrderItem.builder()
+                            .product(item.getProduct())
+                            .quantity(item.getQuantity())
+                            .unitPrice(unitPrice)
+                            .price(lineTotal)
+                            .order(order)
+                            .build();
+                })
                 .toList();
 
         order.setItems(orderItems);
@@ -195,14 +199,17 @@ public class OrderService {
                 zipcode,
                 country,
                 order.getItems().stream()
-                        .map(orderItem -> new OrderItemDTO(
-                                orderItem.getId(),
-                                orderItem.getProduct().getId(),
-                                orderItem.getQuantity(),
-                                orderItem.getPrice(),
-                                orderItem.getPrice()
-                                        .multiply(BigDecimal.valueOf(orderItem.getQuantity()))
-                        ))
+                        .map(orderItem -> {
+                            BigDecimal unitPrice = orderItem.getUnitPrice() != null ? orderItem.getUnitPrice() : orderItem.getProduct().getPrice();
+                            BigDecimal lineTotal = orderItem.getPrice() != null ? orderItem.getPrice() : unitPrice.multiply(BigDecimal.valueOf(orderItem.getQuantity()));
+                            return new OrderItemDTO(
+                                    orderItem.getId(),
+                                    orderItem.getProduct().getId(),
+                                    orderItem.getQuantity(),
+                                    unitPrice,
+                                    lineTotal
+                            );
+                        })
                         .toList(),
                 order.getCreatedAt()
         );

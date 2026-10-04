@@ -3,6 +3,7 @@ package com.app.ecom.security;
 import com.app.ecom.model.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.env.Environment;
+import org.springframework.security.authentication.InsufficientAuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
@@ -25,8 +26,8 @@ public class IdentityResolver {
             return headerUserId;
         }
 
-        throw new org.springframework.security.access.AccessDeniedException(
-                "Access Denied: Session is unauthenticated and fallback headers are disabled in this environment."
+        throw new InsufficientAuthenticationException(
+                "Full authentication is required to access this resource."
         );
     }
 }

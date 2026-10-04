@@ -4,10 +4,13 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -16,11 +19,27 @@ import java.util.function.Function;
 @Service
 public class JwtService {
 
-    @org.springframework.beans.factory.annotation.Value("${jwt.secret:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}")
+    @Value("${jwt.secret:}")
     private String secretKey;
 
     private static final long EXPIRATION_TIME = 86400000; // 24 hours in milliseconds
 
+    @PostConstruct
+    public void init() {
+        if (secretKey == null || secretKey.trim().isEmpty()) {
+            throw new IllegalStateException("JWT_SECRET is required but was not provided in configuration/environment.");
+        }
+        try {
+            SecretKey key = getSigningKey();
+            if (key.getEncoded().length < 32) {
+                throw new IllegalStateException("JWT_SECRET must be at least 256 bits (32 bytes).");
+            }
+        } catch (IllegalStateException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new IllegalStateException("Invalid JWT_SECRET configuration: " + e.getMessage(), e);
+        }
+    }
 
     public String extractUsername(String token) {
         return extractClaim(token, Claims::getSubject);
@@ -67,7 +86,16 @@ public class JwtService {
     }
 
     private SecretKey getSigningKey() {
-        byte[] keyBytes = Decoders.BASE64URL.decode(secretKey);
+        byte[] keyBytes;
+        try {
+            keyBytes = Decoders.BASE64URL.decode(secretKey);
+        } catch (Exception e) {
+            try {
+                keyBytes = Decoders.BASE64.decode(secretKey);
+            } catch (Exception ex) {
+                keyBytes = secretKey.getBytes(StandardCharsets.UTF_8);
+            }
+        }
         return Keys.hmacShaKeyFor(keyBytes);
     }
 }

@@ -1,6 +1,8 @@
 package com.app.ecom.service;
 
 import com.app.ecom.dto.CartItemRequest;
+import com.app.ecom.dto.CartItemResponse;
+import com.app.ecom.exception.BadRequestException;
 import com.app.ecom.model.CartItem;
 import com.app.ecom.model.Product;
 import com.app.ecom.model.User;
@@ -24,38 +26,56 @@ public class CartService {
     private final CartItemRepository cartItemRepository;
     private final UserRepository userRepository;
 
-    public List<CartItem> getCart(String userId) {
+    public List<CartItemResponse> getCart(String userId) {
+        return getCartEntities(userId).stream()
+                .map(this::mapToCartItemResponse)
+                .toList();
+    }
+
+    public List<CartItem> getCartEntities(String userId) {
         return userRepository.findById(Long.valueOf(userId))
                 .map(cartItemRepository::findByUser)
                 .orElseGet(List::of);
     }
 
     public boolean addCart(String userId, CartItemRequest request) {
-        Optional<Product> productOpt = productRepository.findById(request.getProductId());
-        if (productOpt.isEmpty()) {
-            return false;
+        if (request.getQuantity() == null || request.getQuantity() <= 0) {
+            throw new BadRequestException("Quantity must be at least 1.");
         }
-        Product product = productOpt.get();
-        if (product.getStockQuantity() < request.getQuantity()) {
-            return false;
+        Product product = productRepository.findById(request.getProductId())
+                .orElseThrow(() -> new BadRequestException("Product not found with id: " + request.getProductId()));
+
+        if (!Boolean.TRUE.equals(product.getActive())) {
+            throw new BadRequestException("Product " + product.getName() + " is inactive and cannot be added to cart.");
         }
-        Optional<User> userOpt = userRepository.findById(Long.valueOf(userId));
-        if (userOpt.isEmpty()) {
-            return false;
-        }
-        User user = userOpt.get();
+
+        User user = userRepository.findById(Long.valueOf(userId))
+                .orElseThrow(() -> new BadRequestException("User not found with id: " + userId));
 
         CartItem existingCartItem = cartItemRepository.findByUserAndProduct(user, product);
+        int existingQty = existingCartItem != null ? existingCartItem.getQuantity() : 0;
+        int targetQty = existingQty + request.getQuantity();
+
+        if (product.getStockQuantity() < targetQty) {
+            throw new BadRequestException("Requested total quantity (" + targetQty + ") exceeds available stock (" + product.getStockQuantity() + ").");
+        }
+
+        BigDecimal unitPrice = product.getPrice();
+        BigDecimal lineTotal = unitPrice.multiply(BigDecimal.valueOf(targetQty));
+
         if (existingCartItem != null) {
-            existingCartItem.setQuantity(existingCartItem.getQuantity() + request.getQuantity());
-            existingCartItem.setPrice(product.getPrice().multiply(BigDecimal.valueOf(existingCartItem.getQuantity())));
+            existingCartItem.setQuantity(targetQty);
+            existingCartItem.setUnitPrice(unitPrice);
+            existingCartItem.setPrice(lineTotal);
             cartItemRepository.save(existingCartItem);
         } else {
-            CartItem cartItem = new CartItem();
-            cartItem.setUser(user);
-            cartItem.setProduct(product);
-            cartItem.setQuantity(request.getQuantity());
-            cartItem.setPrice(product.getPrice().multiply(BigDecimal.valueOf(request.getQuantity())));
+            CartItem cartItem = CartItem.builder()
+                    .user(user)
+                    .product(product)
+                    .quantity(targetQty)
+                    .unitPrice(unitPrice)
+                    .price(lineTotal)
+                    .build();
             cartItemRepository.save(cartItem);
         }
         return true;
@@ -78,20 +98,29 @@ public class CartService {
         if (quantity <= 0) {
             return deleteItemFromCart(userId, productId);
         }
-        Optional<Product> productOpt = productRepository.findById(productId);
-        Optional<User> userOpt = userRepository.findById(Long.valueOf(userId));
-        if (productOpt.isPresent() && userOpt.isPresent()) {
-            Product product = productOpt.get();
-            if (product.getStockQuantity() < quantity) {
-                return false;
-            }
-            CartItem cartItem = cartItemRepository.findByUserAndProduct(userOpt.get(), product);
-            if (cartItem != null) {
-                cartItem.setQuantity(quantity);
-                cartItem.setPrice(product.getPrice().multiply(BigDecimal.valueOf(quantity)));
-                cartItemRepository.save(cartItem);
-                return true;
-            }
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new BadRequestException("Product not found"));
+
+        if (!Boolean.TRUE.equals(product.getActive())) {
+            throw new BadRequestException("Cannot update quantity for inactive product.");
+        }
+
+        User user = userRepository.findById(Long.valueOf(userId))
+                .orElseThrow(() -> new BadRequestException("User not found"));
+
+        if (product.getStockQuantity() < quantity) {
+            throw new BadRequestException("Requested quantity (" + quantity + ") exceeds available stock (" + product.getStockQuantity() + ").");
+        }
+
+        CartItem cartItem = cartItemRepository.findByUserAndProduct(user, product);
+        if (cartItem != null) {
+            BigDecimal unitPrice = product.getPrice();
+            BigDecimal lineTotal = unitPrice.multiply(BigDecimal.valueOf(quantity));
+            cartItem.setQuantity(quantity);
+            cartItem.setUnitPrice(unitPrice);
+            cartItem.setPrice(lineTotal);
+            cartItemRepository.save(cartItem);
+            return true;
         }
         return false;
     }
@@ -100,5 +129,33 @@ public class CartService {
         userRepository.findById(Long.valueOf(userId))
                 .ifPresent(cartItemRepository::deleteByUser);
     }
-}
 
+    private CartItemResponse mapToCartItemResponse(CartItem item) {
+        BigDecimal unitPrice = item.getUnitPrice() != null ? item.getUnitPrice() : (item.getProduct() != null ? item.getProduct().getPrice() : BigDecimal.ZERO);
+        BigDecimal lineTotal = item.getPrice() != null ? item.getPrice() : unitPrice.multiply(BigDecimal.valueOf(item.getQuantity()));
+
+        CartItemResponse.ProductSummary productSummary = item.getProduct() != null
+                ? CartItemResponse.ProductSummary.builder()
+                .id(item.getProduct().getId())
+                .name(item.getProduct().getName())
+                .imageUrl(item.getProduct().getImageUrl())
+                .price(item.getProduct().getPrice())
+                .stockQuantity(item.getProduct().getStockQuantity())
+                .active(item.getProduct().getActive())
+                .build()
+                : null;
+
+        return CartItemResponse.builder()
+                .id(item.getId())
+                .productId(item.getProduct() != null ? item.getProduct().getId() : null)
+                .productName(item.getProduct() != null ? item.getProduct().getName() : null)
+                .productImage(item.getProduct() != null ? item.getProduct().getImageUrl() : null)
+                .unitPrice(unitPrice)
+                .quantity(item.getQuantity())
+                .lineTotal(lineTotal)
+                .stockQuantity(item.getProduct() != null ? item.getProduct().getStockQuantity() : 0)
+                .active(item.getProduct() != null ? item.getProduct().getActive() : false)
+                .product(productSummary)
+                .build();
+    }
+}

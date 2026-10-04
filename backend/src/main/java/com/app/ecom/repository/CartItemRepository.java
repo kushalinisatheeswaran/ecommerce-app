@@ -9,7 +9,7 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 
 @Repository
-public interface CartItemRepository extends JpaRepository<CartItem,Long> {
+public interface CartItemRepository extends JpaRepository<CartItem, Long> {
 
     CartItem findByUserAndProduct(User user, Product product);
 
@@ -17,5 +17,5 @@ public interface CartItemRepository extends JpaRepository<CartItem,Long> {
 
     List<CartItem> findByUser(User user);
 
-    void deleteByUser(Object user);
+    void deleteByUser(User user);
 }

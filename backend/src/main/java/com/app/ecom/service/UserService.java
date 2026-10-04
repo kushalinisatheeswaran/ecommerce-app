@@ -3,9 +3,11 @@ package com.app.ecom.service;
 import com.app.ecom.dto.AddressDTO;
 import com.app.ecom.dto.UserRequest;
 import com.app.ecom.dto.UserResponse;
+import com.app.ecom.exception.BadRequestException;
+import com.app.ecom.exception.ConflictException;
 import com.app.ecom.model.Address;
-import com.app.ecom.repository.UserRepository;
 import com.app.ecom.model.User;
+import com.app.ecom.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -16,43 +18,53 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class UserService {
-    private  final UserRepository userRepository;
+    private final UserRepository userRepository;
     private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
-    //private List<User> userList = new ArrayList<>();
-    private Long nextId = 1L;
 
     public List<UserResponse> fetchAllUsers() {
-      List<User> userList =userRepository.findAll();
       return userRepository.findAll().stream()
               .map(this::mapToUserResponse)
               .collect(Collectors.toList());
     }
 
     public UserResponse addUser(UserRequest userRequest) {
+        if (userRequest.getEmail() == null || userRequest.getEmail().trim().isEmpty()) {
+            throw new BadRequestException("Email is required.");
+        }
+        String normalizedEmail = userRequest.getEmail().trim().toLowerCase();
+        if (userRepository.existsByEmail(normalizedEmail)) {
+            throw new ConflictException("User with this email already exists.");
+        }
         User user = new User();
         updateUserFromRequest(user, userRequest);
-        User savedUser = userRepository.save(user);
-        return mapToUserResponse(savedUser);
+        user.setEmail(normalizedEmail);
+        try {
+            User savedUser = userRepository.save(user);
+            return mapToUserResponse(savedUser);
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            throw new ConflictException("User with this email already exists.");
+        }
     }
 
     private void updateUserFromRequest(User user, UserRequest userRequest) {
         user.setFirstName(userRequest.getFirstName());
         user.setLastName(userRequest.getLastName());
-        user.setEmail(userRequest.getEmail());
+        if (userRequest.getEmail() != null) {
+            user.setEmail(userRequest.getEmail().trim().toLowerCase());
+        }
         user.setPhone(userRequest.getPhone());
-        if (userRequest.getPassword() != null) {
+        if (userRequest.getPassword() != null && !userRequest.getPassword().isBlank()) {
             user.setPassword(passwordEncoder.encode(userRequest.getPassword()));
         }
 
         if(userRequest.getAddress() !=null){
-            Address address =new Address();
+            Address address = user.getAddress() != null ? user.getAddress() : new Address();
             address.setStreet(userRequest.getAddress().getStreet());
             address.setState(userRequest.getAddress().getState());
             address.setZipcode(userRequest.getAddress().getZipcode());
             address.setCity(userRequest.getAddress().getCity());
             address.setCountry(userRequest.getAddress().getCountry());
             user.setAddress(address);
-
         }
     }
 
@@ -60,7 +72,6 @@ public class UserService {
         return userRepository.findById(id)
                 .map(this::mapToUserResponse);
     }
-
 
     public boolean updateUser(Long id ,UserRequest updatedUserRequest){
         return userRepository.findById(id).map(existingUser ->{
