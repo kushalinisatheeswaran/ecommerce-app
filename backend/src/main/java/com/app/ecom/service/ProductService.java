@@ -2,12 +2,21 @@ package com.app.ecom.service;
 
 import com.app.ecom.dto.ProductRequest;
 import com.app.ecom.dto.ProductResponse;
+import com.app.ecom.exception.BadRequestException;
+import com.app.ecom.exception.ResourceNotFoundException;
 import com.app.ecom.model.Product;
 import com.app.ecom.repository.ProductRepository;
+import com.app.ecom.specification.ProductSpecification;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -15,6 +24,7 @@ import java.util.stream.Collectors;
 public class ProductService {
 
     private final ProductRepository productRepository;
+    private static final Set<String> ALLOWED_SORT_FIELDS = Set.of("id", "name", "price", "createdAt", "category");
 
     public ProductResponse createProduct(ProductRequest productRequest) {
 
@@ -66,9 +76,43 @@ public class ProductService {
         return response;
     }
 
-    public org.springframework.data.domain.Page<ProductResponse> getAllProducts(org.springframework.data.domain.Pageable pageable) {
-        return productRepository.findByActiveTrue(pageable)
-                .map(this::mapToProductResponse);
+    public Page<ProductResponse> getProducts(
+            String search,
+            String category,
+            BigDecimal minPrice,
+            BigDecimal maxPrice,
+            Pageable pageable
+    ) {
+        // Price validations
+        if (minPrice != null && minPrice.compareTo(BigDecimal.ZERO) < 0) {
+            throw new BadRequestException("minPrice cannot be negative");
+        }
+        if (maxPrice != null && maxPrice.compareTo(BigDecimal.ZERO) < 0) {
+            throw new BadRequestException("maxPrice cannot be negative");
+        }
+        if (minPrice != null && maxPrice != null && minPrice.compareTo(maxPrice) > 0) {
+            throw new BadRequestException("minPrice cannot be greater than maxPrice");
+        }
+
+        // Sort field whitelist validation
+        if (pageable.getSort().isSorted()) {
+            for (Sort.Order order : pageable.getSort()) {
+                if (!ALLOWED_SORT_FIELDS.contains(order.getProperty())) {
+                    throw new BadRequestException("Invalid sort field: '" + order.getProperty() + "'. Allowed sort fields are: " + ALLOWED_SORT_FIELDS);
+                }
+            }
+        }
+
+        Specification<Product> spec = ProductSpecification.filterProducts(search, category, minPrice, maxPrice);
+        return productRepository.findAll(spec, pageable).map(this::mapToProductResponse);
+    }
+
+    public Page<ProductResponse> getAllProducts(Pageable pageable) {
+        return getProducts(null, null, null, null, pageable);
+    }
+
+    public List<String> getActiveCategories() {
+        return productRepository.findDistinctActiveCategories();
     }
 
     public ProductResponse getProductById(Long id) {

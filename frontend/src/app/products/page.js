@@ -11,33 +11,48 @@ export default function ProductsPage() {
   const { user } = useAuth();
   const router = useRouter();
   const [products, setProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [size] = useState(6);
   const [sort, setSort] = useState('price,asc');
   const [search, setSearch] = useState('');
+  const [category, setCategory] = useState('');
+  const [minPrice, setMinPrice] = useState('');
+  const [maxPrice, setMaxPrice] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [feedback, setFeedback] = useState({});
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const cats = await productService.getCategories();
+        setCategories(cats || []);
+      } catch (err) {
+        console.error('Could not fetch categories', err);
+      }
+    };
+    fetchCategories();
+  }, []);
 
   const fetchProducts = async () => {
     setLoading(true);
     setError('');
     try {
-      let data;
-      if (search.trim()) {
-        const searchResults = await productService.searchProducts(search);
-        data = {
-          content: searchResults,
-          totalPages: 1,
-        };
-      } else {
-        data = await productService.getProducts(page, size, sort);
-      }
+      const data = await productService.getProducts({
+        search: search.trim() || undefined,
+        category: category || undefined,
+        minPrice: minPrice !== '' ? minPrice : undefined,
+        maxPrice: maxPrice !== '' ? maxPrice : undefined,
+        sort,
+        page,
+        size,
+      });
       setProducts(data.content || []);
       setTotalPages(data.totalPages || 0);
     } catch (err) {
-      setError('Could not fetch products. Please try again.');
+      setError(err.response?.data?.message || 'Could not fetch products. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -45,9 +60,9 @@ export default function ProductsPage() {
 
   useEffect(() => {
     fetchProducts();
-  }, [page, sort]);
+  }, [page, sort, category]);
 
-  const handleSearchSubmit = (e) => {
+  const handleFilterSubmit = (e) => {
     e.preventDefault();
     setPage(0);
     fetchProducts();
@@ -81,19 +96,53 @@ export default function ProductsPage() {
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
         <h1 style={{ fontSize: '2rem', fontWeight: '800' }}>Catalog</h1>
         
-        {/* Search & Sort Controls */}
-        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '0.5rem' }}>
-            <input
-              type="text"
-              placeholder="Search products..."
-              className="form-input"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={{ width: '200px', padding: '0.5rem 1rem' }}
-            />
-            <button type="submit" className="btn btn-secondary" style={{ padding: '0.5rem 1rem' }}>Search</button>
-          </form>
+        {/* Unified Search, Filter & Sort Form */}
+        <form onSubmit={handleFilterSubmit} style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <input
+            type="text"
+            placeholder="Search products..."
+            className="form-input"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{ width: '180px', padding: '0.5rem 1rem' }}
+          />
+
+          <select
+            className="form-input"
+            value={category}
+            onChange={(e) => {
+              setCategory(e.target.value);
+              setPage(0);
+            }}
+            style={{ width: '180px', padding: '0.5rem 1rem', cursor: 'pointer' }}
+          >
+            <option value="">All Categories</option>
+            {categories.map((cat) => (
+              <option key={cat} value={cat}>
+                {cat}
+              </option>
+            ))}
+          </select>
+
+          <input
+            type="number"
+            placeholder="Min $"
+            className="form-input"
+            value={minPrice}
+            onChange={(e) => setMinPrice(e.target.value)}
+            style={{ width: '90px', padding: '0.5rem 0.5rem' }}
+            min="0"
+          />
+
+          <input
+            type="number"
+            placeholder="Max $"
+            className="form-input"
+            value={maxPrice}
+            onChange={(e) => setMaxPrice(e.target.value)}
+            style={{ width: '90px', padding: '0.5rem 0.5rem' }}
+            min="0"
+          />
 
           <select
             className="form-input"
@@ -109,7 +158,11 @@ export default function ProductsPage() {
             <option value="name,asc">Name: A to Z</option>
             <option value="name,desc">Name: Z to A</option>
           </select>
-        </div>
+
+          <button type="submit" className="btn btn-secondary" style={{ padding: '0.5rem 1rem' }}>
+            Filter
+          </button>
+        </form>
       </header>
 
       {error && (
@@ -124,7 +177,7 @@ export default function ProductsPage() {
         </div>
       ) : products.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '5rem', backgroundColor: 'var(--bg-secondary)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-          <p style={{ color: 'var(--text-secondary)' }}>No products found.</p>
+          <p style={{ color: 'var(--text-secondary)' }}>No products found matching criteria.</p>
         </div>
       ) : (
         <>
@@ -180,7 +233,7 @@ export default function ProductsPage() {
           </div>
 
           {/* Pagination */}
-          {!search.trim() && totalPages > 1 && (
+          {totalPages > 1 && (
             <div className="pagination">
               <button 
                 onClick={() => setPage((p) => Math.max(0, p - 1))} 

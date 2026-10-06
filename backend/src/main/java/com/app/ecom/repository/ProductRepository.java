@@ -16,8 +16,10 @@ import java.util.Optional;
 import java.util.Collection;
 import java.util.List;
 
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+
 @Repository
-public interface ProductRepository extends JpaRepository<Product, Long> {
+public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpecificationExecutor<Product> {
     Page<Product> findByActiveTrue(Pageable pageable);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
@@ -32,4 +34,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
        AND LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
        """)
     List<Product> searchProducts(@Param("keyword") String keyword);
+
+    @Query("SELECT DISTINCT p.category FROM Product p WHERE p.active = true AND p.category IS NOT NULL AND TRIM(p.category) <> '' ORDER BY p.category ASC")
+    List<String> findDistinctActiveCategories();
 }

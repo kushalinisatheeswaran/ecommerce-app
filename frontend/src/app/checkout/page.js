@@ -78,8 +78,19 @@ export default function CheckoutPage() {
   }, []);
 
   // Calculations
+  const getItemUnitPrice = (item) => {
+    if (typeof item.unitPrice === 'number') return item.unitPrice;
+    if (typeof item.product?.price === 'number') return item.product.price;
+    return 0;
+  };
+  const getItemLineTotal = (item) => {
+    if (typeof item.lineTotal === 'number') return item.lineTotal;
+    if (typeof item.price === 'number') return item.price;
+    return getItemUnitPrice(item) * (item.quantity || 1);
+  };
+
   const calculateSubtotal = () => {
-    return cartItems.reduce((acc, item) => acc + (item.price || 0), 0);
+    return cartItems.reduce((acc, item) => acc + getItemLineTotal(item), 0);
   };
 
   const subtotal = calculateSubtotal();
@@ -277,28 +288,35 @@ export default function CheckoutPage() {
             <h2 style={{ fontSize: '1.5rem', fontWeight: '700', marginBottom: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '1rem' }}>Order Items Summary</h2>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginBottom: '2rem' }}>
-              {cartItems.map((item) => (
-                <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '10px' }}>
-                  <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                    <div style={{ width: '60px', height: '60px', borderRadius: '8px', overflow: 'hidden', background: '#1e293b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      {item.product.imageUrl ? (
-                        <img src={item.product.imageUrl} alt={item.product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      ) : (
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Item</span>
-                      )}
-                    </div>
-                    <div>
-                      <div style={{ fontWeight: '600', fontSize: '1rem' }}>{item.product.name}</div>
-                      <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                        Price: ${item.product.price.toFixed(2)} × Qty: {item.quantity}
+              {cartItems.map((item) => {
+                const name = item.productName || item.product?.name || 'Product';
+                const imageUrl = item.productImage || item.product?.imageUrl;
+                const unitPrice = getItemUnitPrice(item);
+                const lineTotal = getItemLineTotal(item);
+
+                return (
+                  <div key={item.id || item.productId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '10px' }}>
+                    <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                      <div style={{ width: '60px', height: '60px', borderRadius: '8px', overflow: 'hidden', background: '#1e293b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {imageUrl ? (
+                          <img src={imageUrl} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Item</span>
+                        )}
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: '600', fontSize: '1rem' }}>{name}</div>
+                        <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                          Price: ${unitPrice.toFixed(2)} × Qty: {item.quantity}
+                        </div>
                       </div>
                     </div>
+                    <div style={{ fontWeight: '700', fontSize: '1.1rem' }}>
+                      ${lineTotal.toFixed(2)}
+                    </div>
                   </div>
-                  <div style={{ fontWeight: '700', fontSize: '1.1rem' }}>
-                    ${item.price.toFixed(2)}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Price Calculations */}
@@ -623,12 +641,17 @@ export default function CheckoutPage() {
             <div style={{ marginBottom: '1.75rem' }}>
               <h3 style={{ fontSize: '1.1rem', fontWeight: '600', color: 'var(--accent-color)', marginBottom: '0.75rem' }}>Order Items</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {cartItems.map((item) => (
-                  <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', background: 'rgba(0,0,0,0.2)', padding: '0.75rem 1rem', borderRadius: '8px', fontSize: '0.95rem' }}>
-                    <span>{item.product.name} (x{item.quantity})</span>
-                    <span style={{ fontWeight: '600' }}>${item.price.toFixed(2)}</span>
-                  </div>
-                ))}
+                {cartItems.map((item) => {
+                  const name = item.productName || item.product?.name || 'Product';
+                  const lineTotal = getItemLineTotal(item);
+
+                  return (
+                    <div key={item.id || item.productId} style={{ display: 'flex', justifyContent: 'space-between', background: 'rgba(0,0,0,0.2)', padding: '0.75rem 1rem', borderRadius: '8px', fontSize: '0.95rem' }}>
+                      <span>{name} (x{item.quantity})</span>
+                      <span style={{ fontWeight: '600' }}>${lineTotal.toFixed(2)}</span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 

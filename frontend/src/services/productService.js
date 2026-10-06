@@ -1,10 +1,31 @@
 import api from './api';
 
 export const productService = {
-  getProducts: async (page = 0, size = 10, sort = 'price,asc') => {
-    const response = await api.get(`/api/products`, {
-      params: { page, size, sort },
-    });
+  getProducts: async (options = {}) => {
+    let params = {};
+    if (typeof options === 'number') {
+      const page = arguments[0] ?? 0;
+      const size = arguments[1] ?? 12;
+      const sort = arguments[2] ?? 'id,asc';
+      params = { page, size, sort };
+    } else {
+      const { search, category, minPrice, maxPrice, sort, page = 0, size = 12 } = options;
+      params = {
+        ...(search ? { search } : {}),
+        ...(category ? { category } : {}),
+        ...(minPrice !== undefined && minPrice !== '' ? { minPrice } : {}),
+        ...(maxPrice !== undefined && maxPrice !== '' ? { maxPrice } : {}),
+        ...(sort ? { sort } : {}),
+        page,
+        size,
+      };
+    }
+    const response = await api.get(`/api/products`, { params });
+    return response.data;
+  },
+
+  getCategories: async () => {
+    const response = await api.get('/api/products/categories');
     return response.data;
   },
 

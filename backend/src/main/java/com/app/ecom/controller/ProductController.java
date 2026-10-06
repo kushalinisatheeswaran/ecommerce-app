@@ -26,9 +26,18 @@ public class ProductController {
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
     @GetMapping
-    public ResponseEntity<org.springframework.data.domain.Page<ProductResponse>> getProduct(
-            org.springframework.data.domain.Pageable pageable) {
-      return ResponseEntity.ok(productService.getAllProducts(pageable));
+    public ResponseEntity<org.springframework.data.domain.Page<ProductResponse>> getProducts(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) java.math.BigDecimal minPrice,
+            @RequestParam(required = false) java.math.BigDecimal maxPrice,
+            @org.springframework.data.web.PageableDefault(size = 12, sort = "id") org.springframework.data.domain.Pageable pageable) {
+        return ResponseEntity.ok(productService.getProducts(search, category, minPrice, maxPrice, pageable));
+    }
+
+    @GetMapping("/categories")
+    public ResponseEntity<List<String>> getCategories() {
+        return ResponseEntity.ok(productService.getActiveCategories());
     }
 
     @GetMapping("/{id}")

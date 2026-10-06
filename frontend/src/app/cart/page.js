@@ -27,10 +27,24 @@ export default function CartPage() {
     fetchCart();
   }, []);
 
+  const getItemProductId = (item) => item.productId || item.product?.id;
+  const getItemName = (item) => item.productName || item.product?.name || 'Product';
+  const getItemImage = (item) => item.productImage || item.product?.imageUrl;
+  const getItemUnitPrice = (item) => {
+    if (typeof item.unitPrice === 'number') return item.unitPrice;
+    if (typeof item.product?.price === 'number') return item.product.price;
+    return 0;
+  };
+  const getItemLineTotal = (item) => {
+    if (typeof item.lineTotal === 'number') return item.lineTotal;
+    if (typeof item.price === 'number') return item.price;
+    return getItemUnitPrice(item) * (item.quantity || 1);
+  };
+
   const handleRemove = async (productId) => {
     try {
       await cartService.removeFromCart(productId);
-      setCartItems((items) => items.filter((item) => item.product.id !== productId));
+      setCartItems((items) => items.filter((item) => getItemProductId(item) !== productId));
     } catch (err) {
       setError('Failed to remove item from cart.');
     }
@@ -45,20 +59,28 @@ export default function CartPage() {
     try {
       await cartService.updateCartQuantity(productId, newQuantity);
       setCartItems((items) =>
-        items.map((item) =>
-          item.product.id === productId
-            ? { ...item, quantity: newQuantity, price: item.product.price * newQuantity }
-            : item
-        )
+        items.map((item) => {
+          if (getItemProductId(item) === productId) {
+            const unitPrice = getItemUnitPrice(item);
+            const lineTotal = unitPrice * newQuantity;
+            return {
+              ...item,
+              quantity: newQuantity,
+              unitPrice,
+              lineTotal,
+              price: lineTotal,
+            };
+          }
+          return item;
+        })
       );
     } catch (err) {
-      setError(err.response?.data || 'Failed to update quantity. Please verify stock availability.');
+      setError(err.response?.data?.message || err.response?.data || 'Failed to update quantity. Please verify stock availability.');
     }
   };
 
-
   const calculateTotal = () => {
-    return cartItems.reduce((acc, item) => acc + (item.price || 0), 0);
+    return cartItems.reduce((acc, item) => acc + getItemLineTotal(item), 0);
   };
 
   return (
@@ -83,53 +105,64 @@ export default function CartPage() {
           </div>
         ) : (
           <div>
-            {cartItems.map((item) => (
-              <div className="cart-item" key={item.id}>
-                <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
-                  <div style={{ width: '80px', height: '80px', borderRadius: '8px', background: 'rgba(255,255,255,0.02)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,0.05)', overflow: 'hidden' }}>
-                    {item.product.imageUrl ? (
-                      <img 
-                        src={item.product.imageUrl} 
-                        alt={item.product.name} 
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      />
-                    ) : (
-                      <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>No Image</span>
-                    )}
-                  </div>
-                  <div>
-                    <h3 style={{ fontSize: '1.15rem', fontWeight: '600' }}>{item.product.name}</h3>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem' }}>
-                      <button 
-                        onClick={() => handleUpdateQuantity(item.product.id, item.quantity - 1)}
-                        className="btn btn-secondary"
-                        style={{ padding: '0.2rem 0.6rem', fontSize: '0.75rem', borderRadius: '4px' }}
-                      >
-                        -
-                      </button>
-                      <span style={{ fontWeight: '600', color: 'var(--text-primary)', minWidth: '20px', textAlign: 'center' }}>
-                        {item.quantity}
-                      </span>
-                      <button 
-                        onClick={() => handleUpdateQuantity(item.product.id, item.quantity + 1)}
-                        className="btn btn-secondary"
-                        style={{ padding: '0.2rem 0.6rem', fontSize: '0.75rem', borderRadius: '4px' }}
-                      >
-                        +
-                      </button>
+            {cartItems.map((item) => {
+              const productId = getItemProductId(item);
+              const name = getItemName(item);
+              const imageUrl = getItemImage(item);
+              const unitPrice = getItemUnitPrice(item);
+              const lineTotal = getItemLineTotal(item);
+
+              return (
+                <div className="cart-item" key={item.id || productId}>
+                  <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
+                    <div style={{ width: '80px', height: '80px', borderRadius: '8px', background: 'rgba(255,255,255,0.02)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,0.05)', overflow: 'hidden' }}>
+                      {imageUrl ? (
+                        <img 
+                          src={imageUrl} 
+                          alt={name} 
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                      ) : (
+                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>No Image</span>
+                      )}
                     </div>
+                    <div>
+                      <h3 style={{ fontSize: '1.15rem', fontWeight: '600' }}>{name}</h3>
+                      <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
+                        Unit Price: ${unitPrice.toFixed(2)}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem' }}>
+                        <button 
+                          onClick={() => handleUpdateQuantity(productId, item.quantity - 1)}
+                          className="btn btn-secondary"
+                          style={{ padding: '0.2rem 0.6rem', fontSize: '0.75rem', borderRadius: '4px' }}
+                        >
+                          -
+                        </button>
+                        <span style={{ fontWeight: '600', color: 'var(--text-primary)', minWidth: '20px', textAlign: 'center' }}>
+                          {item.quantity}
+                        </span>
+                        <button 
+                          onClick={() => handleUpdateQuantity(productId, item.quantity + 1)}
+                          className="btn btn-secondary"
+                          style={{ padding: '0.2rem 0.6rem', fontSize: '0.75rem', borderRadius: '4px' }}
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+
                   </div>
 
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
+                    <span style={{ fontSize: '1.25rem', fontWeight: '700' }}>${lineTotal.toFixed(2)}</span>
+                    <button onClick={() => handleRemove(productId)} className="btn btn-danger" style={{ padding: '0.4rem 0.8rem', fontSize: '0.875rem' }}>
+                      Remove
+                    </button>
+                  </div>
                 </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
-                  <span style={{ fontSize: '1.25rem', fontWeight: '700' }}>${item.price.toFixed(2)}</span>
-                  <button onClick={() => handleRemove(item.product.id)} className="btn btn-danger" style={{ padding: '0.4rem 0.8rem', fontSize: '0.875rem' }}>
-                    Remove
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
 
             <div className="cart-summary">
               <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', maxWidth: '300px', marginBottom: '1.5rem', fontSize: '1.25rem' }}>
