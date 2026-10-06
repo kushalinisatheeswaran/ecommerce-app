@@ -23,6 +23,9 @@ public class OrderItem {
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
 
+    @Column(name = "product_name")
+    private String productName;
+
     private Integer quantity;
     private BigDecimal unitPrice;
     private BigDecimal price; // Line total

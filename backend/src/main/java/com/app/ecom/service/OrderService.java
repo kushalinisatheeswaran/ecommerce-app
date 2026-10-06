@@ -5,6 +5,7 @@ import com.app.ecom.dto.OrderRequest;
 import com.app.ecom.dto.OrderResponse;
 import com.app.ecom.exception.BadRequestException;
 import com.app.ecom.model.*;
+import com.app.ecom.repository.CartItemRepository;
 import com.app.ecom.repository.OrderRepository;
 import com.app.ecom.repository.ProductRepository;
 import com.app.ecom.repository.UserRepository;
@@ -26,44 +27,104 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
 
+    private final CartItemRepository cartItemRepository;
+
     public Optional<OrderResponse> createOrder(String userId, OrderRequest request) {
 
-        List<CartItem> cartItems = cartService.getCartEntities(userId);
+        String idempotencyKey = request.getIdempotencyKey();
+        if (idempotencyKey == null || idempotencyKey.isBlank()) {
+            throw new BadRequestException("Idempotency key is required for checkout.");
+        }
+        idempotencyKey = idempotencyKey.trim();
 
+        // 1. Lock user row to guarantee thread-safe checkout & concurrent idempotency resolution
+        User user = userRepository.findByIdForUpdate(Long.valueOf(userId))
+                .orElseGet(() -> userRepository.findById(Long.valueOf(userId)).orElse(null));
+
+        if (user == null) {
+            return Optional.empty();
+        }
+
+        // 2. Check for existing order with same user + idempotency key
+        Optional<Order> existingOrder = orderRepository.findByUserAndIdempotencyKey(user, idempotencyKey);
+        if (existingOrder.isPresent()) {
+            return Optional.of(mapToOrderResponse(existingOrder.get()));
+        }
+
+        List<CartItem> cartItems = cartService.getCartEntities(userId);
         if (cartItems.isEmpty()) {
             throw new BadRequestException("Cannot create an order with an empty cart.");
         }
 
-        Optional<User> userOptional = userRepository.findById(Long.valueOf(userId));
+        // 3. Sort cart items by Product ID ascending to prevent database deadlocks across concurrent carts
+        List<CartItem> sortedCartItems = cartItems.stream()
+                .sorted(java.util.Comparator.comparing(item -> item.getProduct().getId()))
+                .toList();
 
-        if (userOptional.isEmpty()) {
-            return Optional.empty();
+        // 4. Verify prices against live product catalog under lock
+        boolean priceChanged = false;
+        for (CartItem item : sortedCartItems) {
+            Long productId = item.getProduct() != null ? item.getProduct().getId() : null;
+            if (productId == null) {
+                throw new BadRequestException("Cart item product reference is missing.");
+            }
+
+            Product product = productRepository.findByIdForUpdate(productId)
+                    .orElseThrow(() -> new BadRequestException("Product not found with id: " + productId));
+
+            if (item.getUnitPrice() != null && item.getUnitPrice().compareTo(product.getPrice()) != 0) {
+                priceChanged = true;
+                item.setUnitPrice(product.getPrice());
+                item.setPrice(product.getPrice().multiply(BigDecimal.valueOf(item.getQuantity())));
+                cartItemRepository.save(item);
+            }
         }
 
-        User user = userOptional.get();
+        if (priceChanged) {
+            throw new BadRequestException("Price update detected: Some product prices in your cart have changed. Please review your updated total before completing order.");
+        }
 
-        // 1. Validate stock levels & active status
-        for (CartItem item : cartItems) {
-            Product product = item.getProduct();
-            if (product == null || !Boolean.TRUE.equals(product.getActive())) {
-                throw new BadRequestException("Product " + (product != null ? product.getName() : "Item") + " is no longer available.");
+        // 5. Validate stock and build order items
+        BigDecimal subtotal = BigDecimal.ZERO;
+        List<OrderItem> orderItems = new java.util.ArrayList<>();
+
+        Order order = new Order();
+        order.setUser(user);
+        order.setIdempotencyKey(idempotencyKey);
+
+        for (CartItem item : sortedCartItems) {
+            Long productId = item.getProduct().getId();
+            Product product = productRepository.findByIdForUpdate(productId)
+                    .orElseThrow(() -> new BadRequestException("Product not found with id: " + productId));
+
+            if (!Boolean.TRUE.equals(product.getActive())) {
+                throw new BadRequestException("Product " + product.getName() + " is no longer available.");
             }
             if (product.getStockQuantity() < item.getQuantity()) {
                 throw new BadRequestException("Product " + product.getName() + " has insufficient stock (Available: " + product.getStockQuantity() + ").");
             }
-        }
 
-        // 2. Deduct stock levels atomically
-        for (CartItem item : cartItems) {
-            Product product = item.getProduct();
+            // Deduct stock atomically under lock
             product.setStockQuantity(product.getStockQuantity() - item.getQuantity());
             productRepository.save(product);
-        }
 
-        // 3. Authoritative Order Totals Calculation
-        BigDecimal subtotal = cartItems.stream()
-                .map(CartItem::getPrice)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+            // Latest price policy: use current product.getPrice()
+            BigDecimal unitPrice = product.getPrice();
+            BigDecimal lineTotal = unitPrice.multiply(BigDecimal.valueOf(item.getQuantity()));
+            subtotal = subtotal.add(lineTotal);
+
+            // Create OrderItem snapshot
+            OrderItem orderItem = OrderItem.builder()
+                    .product(product)
+                    .productName(product.getName()) // snapshot
+                    .quantity(item.getQuantity())
+                    .unitPrice(unitPrice) // snapshot
+                    .price(lineTotal) // snapshot
+                    .order(order)
+                    .build();
+
+            orderItems.add(orderItem);
+        }
 
         BigDecimal discountAmount = BigDecimal.ZERO;
         // Free delivery on orders over $100, else flat $10 delivery fee
@@ -72,8 +133,6 @@ public class OrderService {
 
         BigDecimal totalAmount = subtotal.subtract(discountAmount).add(deliveryFee).add(codFee);
 
-        Order order = new Order();
-        order.setUser(user);
         order.setSubtotal(subtotal);
         order.setDiscountAmount(discountAmount);
         order.setDeliveryFee(deliveryFee);
@@ -98,21 +157,6 @@ public class OrderService {
         order.setShippingState(request.getState());
         order.setShippingZipcode(request.getZipcode());
         order.setShippingCountry(request.getCountry());
-
-        List<OrderItem> orderItems = cartItems.stream()
-                .map(item -> {
-                    BigDecimal unitPrice = item.getProduct().getPrice();
-                    BigDecimal lineTotal = unitPrice.multiply(BigDecimal.valueOf(item.getQuantity()));
-                    return OrderItem.builder()
-                            .product(item.getProduct())
-                            .quantity(item.getQuantity())
-                            .unitPrice(unitPrice)
-                            .price(lineTotal)
-                            .order(order)
-                            .build();
-                })
-                .toList();
-
         order.setItems(orderItems);
 
         Order savedOrder = orderRepository.save(order);
@@ -200,11 +244,13 @@ public class OrderService {
                 country,
                 order.getItems().stream()
                         .map(orderItem -> {
-                            BigDecimal unitPrice = orderItem.getUnitPrice() != null ? orderItem.getUnitPrice() : orderItem.getProduct().getPrice();
+                            String pName = orderItem.getProductName() != null ? orderItem.getProductName() : (orderItem.getProduct() != null ? orderItem.getProduct().getName() : "Product");
+                            BigDecimal unitPrice = orderItem.getUnitPrice() != null ? orderItem.getUnitPrice() : (orderItem.getProduct() != null ? orderItem.getProduct().getPrice() : BigDecimal.ZERO);
                             BigDecimal lineTotal = orderItem.getPrice() != null ? orderItem.getPrice() : unitPrice.multiply(BigDecimal.valueOf(orderItem.getQuantity()));
                             return new OrderItemDTO(
                                     orderItem.getId(),
-                                    orderItem.getProduct().getId(),
+                                    orderItem.getProduct() != null ? orderItem.getProduct().getId() : null,
+                                    pName,
                                     orderItem.getQuantity(),
                                     unitPrice,
                                     lineTotal

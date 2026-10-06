@@ -12,6 +12,8 @@ public class OrderRequest {
 
     private String cardLast4;
 
+    private String idempotencyKey;
+
     @NotBlank(message = "Full name is required")
     private String fullName;
 

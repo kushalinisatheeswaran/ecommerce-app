@@ -22,7 +22,17 @@ public class OrderController {
     @PostMapping
     public ResponseEntity<OrderResponse> createOrder(
             @RequestHeader(value = "x-user-Id", required = false) String userId,
+            @RequestHeader(value = "X-Idempotency-Key", required = false) String idempotencyHeader,
             @RequestBody @Valid OrderRequest request) {
+
+        String key = request.getIdempotencyKey();
+        if (key == null || key.isBlank()) {
+            key = idempotencyHeader;
+        }
+        if (key == null || key.isBlank()) {
+            throw new com.app.ecom.exception.BadRequestException("Idempotency key is required for checkout.");
+        }
+        request.setIdempotencyKey(key.trim());
 
         String resolvedUserId = identityResolver.resolveUserId(userId);
         return orderService.createOrder(resolvedUserId, request)

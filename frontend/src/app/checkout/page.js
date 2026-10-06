@@ -18,6 +18,7 @@ export default function CheckoutPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [placedOrder, setPlacedOrder] = useState(null);
+  const [idempotencyKey] = useState(() => (typeof window !== 'undefined' && window.crypto && window.crypto.randomUUID ? window.crypto.randomUUID() : 'key-' + Date.now() + '-' + Math.random()));
 
   // Payment State
   const [paymentMethod, setPaymentMethod] = useState(''); // 'CASH_ON_DELIVERY' | 'CARD'
@@ -172,7 +173,8 @@ export default function CheckoutPage() {
         state: addressData.state.trim(),
         zipcode: addressData.zipcode.trim(),
         country: addressData.country.trim(),
-        saveAddressToProfile
+        saveAddressToProfile,
+        idempotencyKey
       };
 
       const res = await orderService.createOrder(payload);

@@ -71,6 +71,15 @@ public class ProductService {
                 .map(this::mapToProductResponse);
     }
 
+    public ProductResponse getProductById(Long id) {
+        Product product = productRepository.findById(id)
+                .orElseThrow(() -> new com.app.ecom.exception.ResourceNotFoundException("Product not found: " + id));
+        if (!Boolean.TRUE.equals(product.getActive())) {
+            throw new com.app.ecom.exception.ResourceNotFoundException("Product not found: " + id);
+        }
+        return mapToProductResponse(product);
+    }
+
     public boolean deleteProduct(Long id) {
         return productRepository.findById(id)
                 .map(product->{

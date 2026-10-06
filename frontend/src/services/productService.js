@@ -9,10 +9,8 @@ export const productService = {
   },
 
   getProductById: async (id) => {
-    // Client-side filtering as fallback since backend lacks single product GET endpoint
-    const response = await api.get('/api/products', { params: { size: 1000 } });
-    const products = response.data.content || [];
-    return products.find((p) => String(p.id) === String(id));
+    const response = await api.get(`/api/products/${id}`);
+    return response.data;
   },
 
   searchProducts: async (keyword) => {

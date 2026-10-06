@@ -12,13 +12,20 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
-@Entity(name = "orders")
+@Entity
+@Table(name = "orders", uniqueConstraints = {
+        @UniqueConstraint(name = "uk_orders_user_idempotency", columnNames = {"user_id", "idempotency_key"})
+})
 @Data
 @NoArgsConstructor
 public class Order {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "idempotency_key")
+    private String idempotencyKey;
+
     @ManyToOne
     @JoinColumn(name = "user_id",nullable = false)
     private User user;
