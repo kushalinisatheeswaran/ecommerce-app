@@ -96,11 +96,11 @@ export default function CartPage() {
 
         {loading ? (
           <div style={{ display: 'flex', justifyContent: 'center', padding: '5rem' }}>
-            <p>Loading your cart...</p>
+            <p style={{ color: 'var(--text-secondary)' }}>Loading your cart...</p>
           </div>
         ) : cartItems.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '5rem', backgroundColor: 'var(--bg-secondary)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-            <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>Your shopping cart is empty.</p>
+          <div style={{ textAlign: 'center', padding: '5rem', backgroundColor: 'var(--bg-secondary)', borderRadius: '12px', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)' }}>
+            <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem', fontSize: '1.1rem' }}>Your shopping cart is empty.</p>
             <Link href="/products" className="btn btn-primary">Continue Shopping</Link>
           </div>
         ) : (
@@ -115,7 +115,7 @@ export default function CartPage() {
               return (
                 <div className="cart-item" key={item.id || productId}>
                   <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
-                    <div style={{ width: '80px', height: '80px', borderRadius: '8px', background: 'rgba(255,255,255,0.02)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,0.05)', overflow: 'hidden' }}>
+                    <div style={{ width: '80px', height: '80px', borderRadius: '8px', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
                       {imageUrl ? (
                         <img 
                           src={imageUrl} 
@@ -123,11 +123,11 @@ export default function CartPage() {
                           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                         />
                       ) : (
-                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>No Image</span>
+                        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>No Image</span>
                       )}
                     </div>
                     <div>
-                      <h3 style={{ fontSize: '1.15rem', fontWeight: '600' }}>{name}</h3>
+                      <h3 style={{ fontSize: '1.1rem', fontWeight: '700', color: 'var(--text-primary)' }}>{name}</h3>
                       <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
                         Unit Price: ${unitPrice.toFixed(2)}
                       </div>
@@ -139,7 +139,7 @@ export default function CartPage() {
                         >
                           -
                         </button>
-                        <span style={{ fontWeight: '600', color: 'var(--text-primary)', minWidth: '20px', textAlign: 'center' }}>
+                        <span style={{ fontWeight: '700', color: 'var(--text-primary)', minWidth: '20px', textAlign: 'center' }}>
                           {item.quantity}
                         </span>
                         <button 
@@ -155,7 +155,7 @@ export default function CartPage() {
                   </div>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
-                    <span style={{ fontSize: '1.25rem', fontWeight: '700' }}>${lineTotal.toFixed(2)}</span>
+                    <span style={{ fontSize: '1.25rem', fontWeight: '800', color: 'var(--text-primary)' }}>${lineTotal.toFixed(2)}</span>
                     <button onClick={() => handleRemove(productId)} className="btn btn-danger" style={{ padding: '0.4rem 0.8rem', fontSize: '0.875rem' }}>
                       Remove
                     </button>
@@ -167,7 +167,7 @@ export default function CartPage() {
             <div className="cart-summary">
               <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', maxWidth: '300px', marginBottom: '1.5rem', fontSize: '1.25rem' }}>
                 <span style={{ color: 'var(--text-secondary)' }}>Subtotal:</span>
-                <span style={{ fontWeight: '700' }}>${calculateTotal().toFixed(2)}</span>
+                <span style={{ fontWeight: '800', color: 'var(--text-primary)' }}>${calculateTotal().toFixed(2)}</span>
               </div>
               <div style={{ display: 'flex', gap: '1rem' }}>
                 <Link href="/products" className="btn btn-secondary">Continue Shopping</Link>

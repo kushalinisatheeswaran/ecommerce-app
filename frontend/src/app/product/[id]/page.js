@@ -60,7 +60,7 @@ export default function ProductDetailPage({ params }) {
   if (loading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', padding: '10rem' }}>
-        <p>Loading product details...</p>
+        <p style={{ color: 'var(--text-secondary)' }}>Loading product details...</p>
       </div>
     );
   }
@@ -77,18 +77,28 @@ export default function ProductDetailPage({ params }) {
   }
 
   return (
-    <div style={{ maxWidth: '1000px', margin: '4rem auto', padding: '0 1.5rem' }}>
-      <Link href="/products" style={{ color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', marginBottom: '2rem', gap: '0.5rem', fontWeight: '500' }}>
-        ← Back to Catalog
+    <div style={{ maxWidth: '1100px', margin: '3rem auto', padding: '0 1.5rem' }}>
+      <Link href="/products" style={{ color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', marginBottom: '2rem', gap: '0.5rem', fontWeight: '600', fontSize: '0.95rem' }}>
+        ← Back to Product Catalog
       </Link>
       
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '3rem', alignItems: 'start' }}>
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', 
+        gap: '3rem', 
+        alignItems: 'start',
+        background: 'var(--bg-secondary)',
+        border: '1px solid var(--border-color)',
+        borderRadius: '16px',
+        padding: '2.5rem',
+        boxShadow: 'var(--shadow-sm)'
+      }}>
         {/* Product Image */}
         <div style={{ 
-          background: 'var(--bg-secondary)', 
-          borderRadius: '16px', 
-          height: '400px', 
-          border: '1px solid rgba(255,255,255,0.05)',
+          background: '#f1f5f9', 
+          borderRadius: '12px', 
+          height: '420px', 
+          border: '1px solid var(--border-color)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -102,31 +112,31 @@ export default function ProductDetailPage({ params }) {
               onError={(e) => { e.target.style.display = 'none'; }}
             />
           ) : (
-            <span style={{ color: 'var(--text-secondary)' }}>No Image Available</span>
+            <span style={{ color: 'var(--text-muted)' }}>No Image Available</span>
           )}
         </div>
 
         {/* Product Info */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           <div>
-            <span style={{ fontSize: '0.875rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--accent-color)', fontWeight: '600' }}>
+            <span style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--accent-color)', fontWeight: '700' }}>
               {product.category}
             </span>
-            <h1 style={{ fontSize: '2.5rem', fontWeight: '800', marginTop: '0.5rem' }}>{product.name}</h1>
+            <h1 style={{ fontSize: '2.25rem', fontWeight: '800', marginTop: '0.35rem', color: 'var(--text-primary)' }}>{product.name}</h1>
           </div>
 
-          <div style={{ fontSize: '2rem', fontWeight: '700' }}>
+          <div style={{ fontSize: '2.2rem', fontWeight: '800', color: 'var(--text-primary)' }}>
             ${product.price.toFixed(2)}
           </div>
 
-          <p style={{ color: 'var(--text-secondary)', fontSize: '1.1rem', lineHeight: '1.7' }}>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '1.05rem', lineHeight: '1.7' }}>
             {product.description}
           </p>
 
-          <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Quantity:</span>
-              <div style={{ display: 'flex', alignItems: 'center', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', overflow: 'hidden' }}>
+          <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '0.95rem', fontWeight: '600', color: 'var(--text-secondary)' }}>Quantity:</span>
+              <div style={{ display: 'flex', alignItems: 'center', border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden' }}>
                 <button 
                   onClick={() => setQuantity((q) => Math.max(1, q - 1))} 
                   className="btn btn-secondary" 
@@ -134,7 +144,7 @@ export default function ProductDetailPage({ params }) {
                 >
                   -
                 </button>
-                <span style={{ minWidth: '40px', textAlign: 'center', fontWeight: '600' }}>{quantity}</span>
+                <span style={{ minWidth: '40px', textAlign: 'center', fontWeight: '700', backgroundColor: '#ffffff' }}>{quantity}</span>
                 <button 
                   onClick={() => setQuantity((q) => Math.min(product.stockQuantity, q + 1))} 
                   className="btn btn-secondary" 
@@ -143,8 +153,8 @@ export default function ProductDetailPage({ params }) {
                   +
                 </button>
               </div>
-              <span style={{ fontSize: '0.85rem', color: product.stockQuantity > 0 ? 'var(--success-color)' : 'var(--danger-color)' }}>
-                {product.stockQuantity > 0 ? `${product.stockQuantity} items in stock` : 'Out of Stock'}
+              <span style={{ fontSize: '0.85rem', fontWeight: '600', color: product.stockQuantity > 0 ? 'var(--success-color)' : 'var(--danger-color)' }}>
+                {product.stockQuantity > 0 ? `${product.stockQuantity} in stock` : 'Out of Stock'}
               </span>
             </div>
 
@@ -152,9 +162,9 @@ export default function ProductDetailPage({ params }) {
               <div style={{ 
                 fontSize: '0.9rem', 
                 color: feedback.status === 'success' ? 'var(--success-color)' : 'var(--danger-color)',
-                backgroundColor: feedback.status === 'success' ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                padding: '0.75rem',
-                borderRadius: '6px'
+                backgroundColor: feedback.status === 'success' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                padding: '0.75rem 1rem',
+                borderRadius: '8px'
               }}>
                 {feedback.message}
               </div>
@@ -163,7 +173,7 @@ export default function ProductDetailPage({ params }) {
             <button 
               onClick={handleAddToCart} 
               className="btn btn-primary"
-              style={{ width: '100%', padding: '1rem', fontSize: '1.1rem' }}
+              style={{ width: '100%', padding: '0.9rem', fontSize: '1.05rem' }}
               disabled={product.stockQuantity <= 0 || isAdding}
             >
               {isAdding ? 'Adding...' : product.stockQuantity <= 0 ? 'Out of Stock' : 'Add to Cart'}
