@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { productService } from '../services/productService';
 import { cartService } from '../services/cartService';
@@ -19,6 +19,54 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [feedback, setFeedback] = useState({});
 
+  const heroRef = useRef(null);
+  const rafIdRef = useRef(null);
+
+  const handleMouseMove = (e) => {
+    if (!heroRef.current) return;
+
+    // Respect reduced motion & touch devices
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || window.matchMedia('(pointer: coarse)').matches) {
+      return;
+    }
+
+    const rect = heroRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    // Normalized from -1 to +1
+    const normX = ((x / rect.width) * 2 - 1);
+    const normY = ((y / rect.height) * 2 - 1);
+
+    if (rafIdRef.current) {
+      cancelAnimationFrame(rafIdRef.current);
+    }
+
+    rafIdRef.current = requestAnimationFrame(() => {
+      if (!heroRef.current) return;
+      heroRef.current.style.setProperty('--mouse-x', `${(x / rect.width) * 100}%`);
+      heroRef.current.style.setProperty('--mouse-y', `${(y / rect.height) * 100}%`);
+      heroRef.current.style.setProperty('--norm-x', normX.toFixed(3));
+      heroRef.current.style.setProperty('--norm-y', normY.toFixed(3));
+      heroRef.current.style.setProperty('--glow-opacity', '1');
+    });
+  };
+
+  const handleMouseLeave = () => {
+    if (!heroRef.current) return;
+    if (rafIdRef.current) {
+      cancelAnimationFrame(rafIdRef.current);
+    }
+    rafIdRef.current = requestAnimationFrame(() => {
+      if (!heroRef.current) return;
+      heroRef.current.style.setProperty('--norm-x', '0');
+      heroRef.current.style.setProperty('--norm-y', '0');
+      heroRef.current.style.setProperty('--mouse-x', '50%');
+      heroRef.current.style.setProperty('--mouse-y', '50%');
+      heroRef.current.style.setProperty('--glow-opacity', '0.7');
+    });
+  };
+
   useEffect(() => {
     const fetchHomeData = async () => {
       setLoading(true);
@@ -27,8 +75,8 @@ export default function HomePage() {
           productService.getProducts({ sort: 'createdAt,desc', page: 0, size: 4 }),
           productService.getProducts({ sort: 'price,desc', page: 0, size: 4 }),
           productService.getProducts({ category: 'Beauty & Personal Care', page: 0, size: 4 }),
-          productService.getProducts({ category: 'Fashion', page: 0, size: 4 }),
-          productService.getProducts({ category: 'Electronics', page: 0, size: 4 }),
+          productService.getProducts({ category: 'Fashion (Men/Women)', page: 0, size: 4 }),
+          productService.getProducts({ category: 'Smartphones', page: 0, size: 4 }),
         ]);
 
         setNewArrivals(newRes.content || []);
@@ -69,13 +117,29 @@ export default function HomePage() {
   };
 
   const curatingCategories = [
-    { title: 'Electronics', icon: '💻', count: 'Laptops, TVs & Accessories' },
-    { title: 'Fashion', icon: '👔', count: 'Men, Women & Footwear' },
-    { title: 'Beauty & Personal Care', icon: '✨', count: 'Skincare & Wellness' },
-    { title: 'Home Appliances', icon: '🏠', count: 'Living & Kitchen Gadgets' },
-    { title: 'Gaming', icon: '🎮', count: 'Consoles & Peripherals' },
-    { title: 'Books', icon: '📚', count: 'Literature & Learning' },
+    { title: 'Electronics', icon: '💻', count: 'Laptops, TVs & Accessories', categoryParam: 'Smartphones' },
+    { title: 'Fashion', icon: '👔', count: 'Men, Women & Footwear', categoryParam: 'Fashion (Men/Women)' },
+    { title: 'Beauty & Personal Care', icon: '✨', count: 'Skincare & Wellness', categoryParam: 'Beauty & Personal Care' },
+    { title: 'Home Appliances', icon: '🏠', count: 'Living & Kitchen Gadgets', categoryParam: 'Home Appliances' },
+    { title: 'Gaming', icon: '🎮', count: 'Consoles & Peripherals', categoryParam: 'Gaming' },
+    { title: 'Books', icon: '📚', count: 'Literature & Learning', categoryParam: 'Books' },
   ];
+
+  const [currentSlide, setCurrentSlide] = useState(0);
+
+  const heroSlides = React.useMemo(() => {
+    return [...exploreProducts, ...newArrivals]
+      .filter((p, index, self) => p && p.imageUrl && self.findIndex((x) => x.id === p.id) === index)
+      .slice(0, 5);
+  }, [exploreProducts, newArrivals]);
+
+  useEffect(() => {
+    if (heroSlides.length <= 1) return;
+    const interval = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % heroSlides.length);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [heroSlides]);
 
   const renderProductRow = (productsList) => (
     <div className="product-grid">
@@ -131,105 +195,140 @@ export default function HomePage() {
   );
 
   return (
-    <div style={{ maxWidth: '1240px', margin: '0 auto', padding: '0 1.5rem' }}>
-      
-      {/* 1. HERO SECTION */}
-      <section style={{
-        background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)',
-        color: '#ffffff',
-        borderRadius: '20px',
-        padding: '4rem 3rem',
-        marginTop: '2rem',
-        marginBottom: '3.5rem',
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-        gap: '2.5rem',
-        alignItems: 'center',
-        boxShadow: 'var(--shadow-lg)'
-      }}>
-        <div>
-          <span style={{ 
-            fontSize: '0.85rem', 
-            fontWeight: '700', 
-            textTransform: 'uppercase', 
-            letterSpacing: '0.1em', 
-            color: '#a5b4fc', 
-            backgroundColor: 'rgba(165, 180, 252, 0.1)',
-            padding: '0.35rem 0.85rem',
-            borderRadius: '20px',
-            display: 'inline-block',
-            marginBottom: '1rem'
-          }}>
-            Next-Gen Marketplace
-          </span>
-          <h1 style={{ fontSize: '2.8rem', fontWeight: '800', lineHeight: '1.2', marginBottom: '1.25rem' }}>
-            Discover products for every part of your day.
-          </h1>
-          <p style={{ fontSize: '1.1rem', color: '#94a3b8', lineHeight: '1.6', marginBottom: '2rem' }}>
-            Explore our curated catalog featuring electronics, fashion, beauty, books, and home appliances with real-time stock and dynamic sorting.
-          </p>
-          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-            <Link href="/products" className="btn btn-primary" style={{ padding: '0.85rem 1.75rem', fontSize: '1rem' }}>
-              Shop Now
-            </Link>
-            <a href="#categories" className="btn btn-outline" style={{ padding: '0.85rem 1.75rem', fontSize: '1rem' }}>
-              Browse Categories
-            </a>
-          </div>
-        </div>
+    <div>
+      {/* 1. IMMERSIVE CINEMATIC ADVERTISING HERO */}
+      <div className="hero-fluid-outer-wrapper">
+        <section 
+          ref={heroRef}
+          className="cinematic-hero-section"
+          onMouseMove={handleMouseMove}
+          onMouseLeave={handleMouseLeave}
+        >
+          {/* Layer 1: Dark Premium Radial/Glow Background */}
+          <div className="hero-bg-base" />
 
-        {/* RIGHT SIDE: ANIMATED FLOATING PRODUCT COLLAGE */}
-        <div className="hero-visual-wrapper">
-          <div className="hero-glow-orb" />
-          <div className="hero-collage-container">
-            {(() => {
-              const heroItems = [...newArrivals, ...exploreProducts]
-                .filter((p, index, self) => p && p.imageUrl && self.findIndex((x) => x.id === p.id) === index)
-                .slice(0, 4);
+          {/* Dynamic Slide-Specific Accent Glow */}
+          {heroSlides.map((prod, idx) => {
+            const categoryGlowClass = 
+              prod?.category?.toLowerCase().includes('electronics') ? 'glow-blue' :
+              prod?.category?.toLowerCase().includes('beauty') ? 'glow-pink' :
+              prod?.category?.toLowerCase().includes('fashion') ? 'glow-amber' :
+              prod?.category?.toLowerCase().includes('gaming') ? 'glow-purple' : 'glow-indigo';
 
-              const cardClasses = [
-                'hero-card-primary',
-                'hero-card-secondary',
-                'hero-card-tertiary',
-                'hero-card-quaternary',
-              ];
+            return (
+              <div 
+                key={`glow-${prod?.id || idx}`}
+                className={`hero-accent-glow ${categoryGlowClass} ${idx === currentSlide ? 'active' : ''}`} 
+              />
+            );
+          })}
 
-              const fallbackIcons = ['💻', '🎧', '✨', '👔'];
+          {/* Layer 2: Oversized Background Typography (Behind Product) */}
+          <div className="hero-typography-layer" aria-hidden="true">
+            {heroSlides.map((prod, idx) => {
+              let bgWord = 'DISCOVER';
+              const cat = prod?.category?.toLowerCase() || '';
+              if (cat.includes('electronics')) bgWord = 'TECH';
+              else if (cat.includes('beauty')) bgWord = 'BEAUTY';
+              else if (cat.includes('fashion')) bgWord = 'STYLE';
+              else if (cat.includes('gaming')) bgWord = 'PLAY';
+              else if (cat.includes('book')) bgWord = 'CREATE';
 
-              if (heroItems.length > 0) {
-                return heroItems.map((prod, idx) => (
-                  <Link
-                    key={prod.id}
-                    href={`/product/${prod.id}`}
-                    className={`hero-card ${cardClasses[idx % 4]}`}
-                  >
-                    <div className="hero-card-img-box">
-                      <img
-                        src={prod.imageUrl}
-                        alt={prod.name}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        onError={(e) => { e.target.style.display = 'none'; }}
-                      />
-                    </div>
-                    <span className="hero-card-badge">{prod.category}</span>
-                    <span className="hero-card-title">{prod.name}</span>
-                    <span className="hero-card-price">${prod.price.toFixed(2)}</span>
-                  </Link>
-                ));
-              }
-
-              return fallbackIcons.map((icon, idx) => (
-                <div key={idx} className={`hero-card ${cardClasses[idx]}`}>
-                  <div className="hero-card-img-box" style={{ fontSize: '2.5rem' }}>
-                    {icon}
-                  </div>
-                  <span className="hero-card-title">Featured Item</span>
+              return (
+                <div
+                  key={`bgtext-${prod?.id || idx}`}
+                  className={`hero-bg-word ${idx === currentSlide ? 'active' : ''}`}
+                >
+                  {bgWord}
                 </div>
-              ));
-            })()}
+              );
+            })}
           </div>
-        </div>
-      </section>
+
+          {/* Layer 3: Layered Product & Information Stage */}
+          <div className="hero-cinematic-stage">
+            {/* Left Content / Info & CTA */}
+            <div className="hero-stage-content">
+              {heroSlides[currentSlide] && (
+                <span className="hero-category-tag">
+                  ✨ {heroSlides[currentSlide].category || 'Featured Collection'}
+                </span>
+              )}
+              <h1 className="hero-headline">
+                {currentSlide === 0 && 'Next-Gen Technology & Lifestyle.'}
+                {currentSlide === 1 && 'Elevate Your Everyday Style.'}
+                {currentSlide === 2 && 'Pure Radiance & Luxury Care.'}
+                {currentSlide === 3 && 'Unmatched Performance & Play.'}
+                {currentSlide >= 4 && 'Explore Premium Catalog Arrivals.'}
+              </h1>
+              <p className="hero-description">
+                Experience curated craftsmanship, cutting-edge innovations, and exclusive prices delivered right to your doorstep.
+              </p>
+
+              <div className="hero-cta-group">
+                <Link href="/products" className="btn btn-primary hero-btn-primary">
+                  Shop Now
+                </Link>
+                <a href="#categories" className="btn btn-outline hero-btn-outline">
+                  Browse Categories
+                </a>
+              </div>
+
+              {/* Active Product Details & Direct Link */}
+              {heroSlides[currentSlide] && (
+                <div className="hero-featured-card-link">
+                  <Link href={`/product/${heroSlides[currentSlide].id}`} className="hero-featured-link-box">
+                    <div className="hero-featured-info">
+                      <span className="hero-featured-name">{heroSlides[currentSlide].name}</span>
+                      <span className="hero-featured-price">${heroSlides[currentSlide].price?.toFixed(2)}</span>
+                    </div>
+                    <span className="hero-featured-arrow">→</span>
+                  </Link>
+                </div>
+              )}
+            </div>
+
+            {/* Right Visual: Dominant Layered Product Image (Layer 4 - In Front of Text) */}
+            <div className="hero-stage-visual">
+              {heroSlides.map((prod, idx) => (
+                <div
+                  key={`prod-visual-${prod.id}`}
+                  className={`hero-product-image-wrapper ${idx === currentSlide ? 'active' : ''}`}
+                >
+                  {prod.imageUrl ? (
+                    <img
+                      src={prod.imageUrl}
+                      alt={prod.name}
+                      className="hero-product-dominant-img"
+                      onError={(e) => { e.target.style.display = 'none'; }}
+                    />
+                  ) : (
+                    <div className="hero-product-fallback">
+                      <span>{prod.name}</span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Dots Navigation */}
+          {heroSlides.length > 1 && (
+            <div className="hero-slideshow-dots">
+              {heroSlides.map((_, idx) => (
+                <button
+                  key={idx}
+                  className={`hero-dot ${idx === currentSlide ? 'active' : ''}`}
+                  onClick={() => setCurrentSlide(idx)}
+                  aria-label={`Go to slide ${idx + 1}`}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
+
+      <div style={{ maxWidth: '1240px', margin: '0 auto', padding: '0 1.5rem' }}>
 
       {/* 2. SHOP BY CATEGORY */}
       <section id="categories" style={{ marginBottom: '4rem' }}>
@@ -244,7 +343,7 @@ export default function HomePage() {
           {curatingCategories.map((cat) => (
             <Link 
               key={cat.title} 
-              href={`/products?category=${encodeURIComponent(cat.title)}`}
+              href={`/products?category=${encodeURIComponent(cat.categoryParam || cat.title)}`}
               style={{
                 background: 'var(--bg-secondary)',
                 border: '1px solid var(--border-color)',
@@ -320,7 +419,7 @@ export default function HomePage() {
               <h2 style={{ fontSize: '1.8rem', fontWeight: '800' }}>Fashion Essentials</h2>
               <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Modern clothing and apparel</p>
             </div>
-            <Link href={`/products?category=${encodeURIComponent('Fashion')}`} style={{ color: 'var(--accent-color)', fontWeight: '600', fontSize: '0.95rem' }}>
+            <Link href={`/products?category=${encodeURIComponent('Fashion (Men/Women)')}`} style={{ color: 'var(--accent-color)', fontWeight: '600', fontSize: '0.95rem' }}>
               View Category →
             </Link>
           </div>
@@ -347,6 +446,7 @@ export default function HomePage() {
         </Link>
       </section>
 
+      </div>
     </div>
   );
 }
