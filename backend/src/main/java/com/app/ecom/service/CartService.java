@@ -38,10 +38,16 @@ public class CartService {
                 .orElseGet(List::of);
     }
 
+    private static final int MAX_CART_QUANTITY = 999;
+
     public boolean addCart(String userId, CartItemRequest request) {
         if (request.getQuantity() == null || request.getQuantity() <= 0) {
             throw new BadRequestException("Quantity must be at least 1.");
         }
+        if (request.getQuantity() > MAX_CART_QUANTITY) {
+            throw new BadRequestException("Quantity exceeds maximum allowed limit per item (" + MAX_CART_QUANTITY + ").");
+        }
+
         Product product = productRepository.findById(request.getProductId())
                 .orElseThrow(() -> new BadRequestException("Product not found with id: " + request.getProductId()));
 
@@ -54,7 +60,12 @@ public class CartService {
 
         CartItem existingCartItem = cartItemRepository.findByUserAndProduct(user, product);
         int existingQty = existingCartItem != null ? existingCartItem.getQuantity() : 0;
-        int targetQty = existingQty + request.getQuantity();
+        
+        long targetQtyLong = (long) existingQty + request.getQuantity();
+        if (targetQtyLong > MAX_CART_QUANTITY || targetQtyLong > Integer.MAX_VALUE) {
+            throw new BadRequestException("Requested total quantity exceeds maximum allowed limit per item (" + MAX_CART_QUANTITY + ").");
+        }
+        int targetQty = (int) targetQtyLong;
 
         if (product.getStockQuantity() < targetQty) {
             throw new BadRequestException("Requested total quantity (" + targetQty + ") exceeds available stock (" + product.getStockQuantity() + ").");
@@ -97,6 +108,9 @@ public class CartService {
     public boolean updateCartItemQuantity(String userId, Long productId, int quantity) {
         if (quantity <= 0) {
             return deleteItemFromCart(userId, productId);
+        }
+        if (quantity > MAX_CART_QUANTITY) {
+            throw new BadRequestException("Quantity exceeds maximum allowed limit per item (" + MAX_CART_QUANTITY + ").");
         }
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new BadRequestException("Product not found"));

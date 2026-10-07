@@ -8,6 +8,7 @@ import com.app.ecom.repository.CartItemRepository;
 import com.app.ecom.repository.OrderRepository;
 import com.app.ecom.repository.ProductRepository;
 import com.app.ecom.repository.UserRepository;
+import com.app.ecom.service.CartPriceUpdateService;
 import com.app.ecom.service.CartService;
 import com.app.ecom.service.OrderService;
 import org.junit.jupiter.api.Test;
@@ -37,6 +38,9 @@ class Phase1PricingTest {
     private OrderRepository orderRepository;
     @Mock
     private ProductRepository productRepository;
+
+    @Mock
+    private CartPriceUpdateService cartPriceUpdateService;
 
     @InjectMocks
     private OrderService orderService;
@@ -75,16 +79,12 @@ class Phase1PricingTest {
         request.setZipcode("12345");
         request.setCountry("Country");
 
-        when(userRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(user));
-        when(cartService.getCartEntities("1")).thenReturn(List.of(cartItem));
-        when(productRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(product));
+        when(cartPriceUpdateService.checkAndUpdateStalePrices(1L)).thenReturn(true);
 
         BadRequestException ex = assertThrows(BadRequestException.class, () -> orderService.createOrder("1", request));
         assertTrue(ex.getMessage().contains("Price update detected"));
 
-        verify(cartItemRepository, times(1)).save(argThat(c ->
-                new BigDecimal("25.00").equals(c.getUnitPrice()) && new BigDecimal("50.00").equals(c.getPrice())
-        ));
+        verify(cartPriceUpdateService, times(1)).checkAndUpdateStalePrices(1L);
     }
 
     @Test

@@ -33,8 +33,9 @@ public class AdminProductService {
     }
 
     public ProductResponse updateProduct(Long id, ProductRequest request) {
-        Product product = productRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + id));
+        Product product = productRepository.findByIdForUpdate(id)
+                .orElseGet(() -> productRepository.findById(id)
+                        .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + id)));
         updateProductFields(product, request);
         Product savedProduct = productRepository.save(product);
         return mapToProductResponse(savedProduct);

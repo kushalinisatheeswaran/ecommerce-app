@@ -26,8 +26,8 @@ public class OrderService {
     private final UserRepository userRepository;
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
-
     private final CartItemRepository cartItemRepository;
+    private final CartPriceUpdateService cartPriceUpdateService;
 
     public Optional<OrderResponse> createOrder(String userId, OrderRequest request) {
 
@@ -37,7 +37,15 @@ public class OrderService {
         }
         idempotencyKey = idempotencyKey.trim();
 
-        // 1. Lock user row to guarantee thread-safe checkout & concurrent idempotency resolution
+        // 1. Un-locked pre-check & update of stale cart prices in an independent transaction BEFORE outer locks are acquired
+        if (cartPriceUpdateService != null) {
+            boolean stalePriceDetected = cartPriceUpdateService.checkAndUpdateStalePrices(Long.valueOf(userId));
+            if (stalePriceDetected) {
+                throw new BadRequestException("Price update detected: Some product prices in your cart have changed. Please review your updated total before completing order.");
+            }
+        }
+
+        // 2. Lock user row to guarantee thread-safe checkout & concurrent idempotency resolution
         User user = userRepository.findByIdForUpdate(Long.valueOf(userId))
                 .orElseGet(() -> userRepository.findById(Long.valueOf(userId)).orElse(null));
 
@@ -45,7 +53,7 @@ public class OrderService {
             return Optional.empty();
         }
 
-        // 2. Check for existing order with same user + idempotency key
+        // 3. Check for existing order with same user + idempotency key
         Optional<Order> existingOrder = orderRepository.findByUserAndIdempotencyKey(user, idempotencyKey);
         if (existingOrder.isPresent()) {
             return Optional.of(mapToOrderResponse(existingOrder.get()));
@@ -56,33 +64,10 @@ public class OrderService {
             throw new BadRequestException("Cannot create an order with an empty cart.");
         }
 
-        // 3. Sort cart items by Product ID ascending to prevent database deadlocks across concurrent carts
+        // 4. Sort cart items by Product ID ascending to prevent database deadlocks across concurrent carts
         List<CartItem> sortedCartItems = cartItems.stream()
                 .sorted(java.util.Comparator.comparing(item -> item.getProduct().getId()))
                 .toList();
-
-        // 4. Verify prices against live product catalog under lock
-        boolean priceChanged = false;
-        for (CartItem item : sortedCartItems) {
-            Long productId = item.getProduct() != null ? item.getProduct().getId() : null;
-            if (productId == null) {
-                throw new BadRequestException("Cart item product reference is missing.");
-            }
-
-            Product product = productRepository.findByIdForUpdate(productId)
-                    .orElseThrow(() -> new BadRequestException("Product not found with id: " + productId));
-
-            if (item.getUnitPrice() != null && item.getUnitPrice().compareTo(product.getPrice()) != 0) {
-                priceChanged = true;
-                item.setUnitPrice(product.getPrice());
-                item.setPrice(product.getPrice().multiply(BigDecimal.valueOf(item.getQuantity())));
-                cartItemRepository.save(item);
-            }
-        }
-
-        if (priceChanged) {
-            throw new BadRequestException("Price update detected: Some product prices in your cart have changed. Please review your updated total before completing order.");
-        }
 
         // 5. Validate stock and build order items
         BigDecimal subtotal = BigDecimal.ZERO;
@@ -93,6 +78,9 @@ public class OrderService {
         order.setIdempotencyKey(idempotencyKey);
 
         for (CartItem item : sortedCartItems) {
+            if (item.getQuantity() <= 0) {
+                throw new BadRequestException("Invalid cart item quantity: " + item.getQuantity());
+            }
             Long productId = item.getProduct().getId();
             Product product = productRepository.findByIdForUpdate(productId)
                     .orElseThrow(() -> new BadRequestException("Product not found with id: " + productId));
@@ -217,8 +205,9 @@ public class OrderService {
     }
 
     public OrderResponse updateOrderStatusForAdmin(Long orderId, OrderStatus newStatus) {
-        Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new com.app.ecom.exception.ResourceNotFoundException("Order not found with id: " + orderId));
+        Order order = orderRepository.findByIdForUpdate(orderId)
+                .orElseGet(() -> orderRepository.findById(orderId)
+                        .orElseThrow(() -> new com.app.ecom.exception.ResourceNotFoundException("Order not found with id: " + orderId)));
 
         OrderStatus currentStatus = order.getStatus();
         if (currentStatus == newStatus) {

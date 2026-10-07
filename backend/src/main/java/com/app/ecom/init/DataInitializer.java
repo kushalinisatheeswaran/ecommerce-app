@@ -4,7 +4,6 @@ import com.app.ecom.model.Product;
 import com.app.ecom.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -16,13 +15,13 @@ import java.util.List;
 public class DataInitializer implements CommandLineRunner {
 
     private final ProductRepository productRepository;
-    private final JdbcTemplate jdbcTemplate;
+
+    @org.springframework.beans.factory.annotation.Value("${app.seed.enabled:false}")
+    private boolean seedEnabled;
 
     @Override
     public void run(String... args) throws Exception {
-        fixDatabaseCheckConstraints();
-
-        if (productRepository.count() == 0) {
+        if (seedEnabled && productRepository.count() == 0) {
             List<Product> products = Arrays.asList(
                 // Category: Smartphones (5 products)
                 createProduct("Apple iPhone 15 Pro Max", "Experience the power of titanium with the new A17 Pro chip, custom Action button, and the most powerful iPhone camera system ever. Features a 6.7-inch Super Retina XDR display with ProMotion.", "1199.99", 45, "Smartphones", "https://images.unsplash.com/photo-1695048133142-1a20484d2569?auto=format&fit=crop&w=600&q=80"),
@@ -171,21 +170,6 @@ public class DataInitializer implements CommandLineRunner {
 
             productRepository.saveAll(products);
             System.out.println(">> Database seeded successfully with 100 products!");
-        }
-    }
-
-    private void fixDatabaseCheckConstraints() {
-        try {
-            jdbcTemplate.execute("ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_status_check");
-            jdbcTemplate.execute("ALTER TABLE orders ADD CONSTRAINT orders_status_check CHECK (status IN ('PLACED', 'PROCESSING', 'PENDING', 'CONFIRMED', 'SHIPPED', 'DELIVERED', 'CANCELLED'))");
-            
-            jdbcTemplate.execute("ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_payment_status_check");
-            jdbcTemplate.execute("ALTER TABLE orders ADD CONSTRAINT orders_payment_status_check CHECK (payment_status IN ('PENDING', 'PAID_TEST', 'FAILED'))");
-            
-            jdbcTemplate.execute("ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_payment_method_check");
-            jdbcTemplate.execute("ALTER TABLE orders ADD CONSTRAINT orders_payment_method_check CHECK (payment_method IN ('CASH_ON_DELIVERY', 'CARD'))");
-        } catch (Exception e) {
-            System.err.println("Note on constraint update: " + e.getMessage());
         }
     }
 
