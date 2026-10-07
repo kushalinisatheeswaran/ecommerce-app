@@ -44,6 +44,20 @@ export default function Navbar() {
         {user ? (
           <>
             <Link 
+              href="/wishlist" 
+              className={`nav-link ${isActive('/wishlist') ? 'active' : ''}`}
+              onClick={() => setMobileOpen(false)}
+            >
+              Wishlist
+            </Link>
+            <Link 
+              href="/account" 
+              className={`nav-link ${isActive('/account') ? 'active' : ''}`}
+              onClick={() => setMobileOpen(false)}
+            >
+              Account
+            </Link>
+            <Link 
               href="/cart" 
               className={`nav-link ${isActive('/cart') ? 'active' : ''}`}
               onClick={() => setMobileOpen(false)}
@@ -73,9 +87,13 @@ export default function Navbar() {
       <div className="nav-actions">
         {user ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <span style={{ fontSize: '0.85rem', color: '#94a3b8' }} className="user-email-badge">
-              {user.email}
-            </span>
+            <Link
+              href="/account"
+              style={{ fontSize: '0.85rem', color: '#94a3b8', textDecoration: 'none' }}
+              className="user-email-badge"
+            >
+              👤 {user.email}
+            </Link>
             <button 
               onClick={handleLogout} 
               className="btn btn-outline" 

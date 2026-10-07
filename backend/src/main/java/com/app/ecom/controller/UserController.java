@@ -30,6 +30,26 @@ public class UserController {
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
+    @PutMapping("/me/profile")
+    public ResponseEntity<UserResponse> updateMyProfile(
+            @RequestHeader(value = "x-user-id", required = false) String userIdHeader,
+            @RequestBody com.app.ecom.dto.ProfileUpdateRequest request) {
+        String userIdStr = identityResolver.resolveUserId(userIdHeader);
+        Long userId = Long.valueOf(userIdStr);
+        UserResponse response = userService.updateProfile(userId, request);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/me/change-password")
+    public ResponseEntity<java.util.Map<String, String>> changeMyPassword(
+            @RequestHeader(value = "x-user-id", required = false) String userIdHeader,
+            @RequestBody @Valid com.app.ecom.dto.ChangePasswordRequest request) {
+        String userIdStr = identityResolver.resolveUserId(userIdHeader);
+        Long userId = Long.valueOf(userIdStr);
+        userService.changePassword(userId, request);
+        return ResponseEntity.ok(java.util.Map.of("message", "Password changed successfully"));
+    }
+
     @GetMapping
     public ResponseEntity<List<UserResponse>> getAllUsers() {
         return new ResponseEntity<>(userService.fetchAllUsers(), HttpStatus.OK);

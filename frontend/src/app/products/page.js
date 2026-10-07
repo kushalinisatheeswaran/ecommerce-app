@@ -3,6 +3,7 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import { productService } from '../../services/productService';
 import { cartService } from '../../services/cartService';
+import { wishlistService } from '../../services/wishlistService';
 import { useAuth } from '../../context/AuthContext';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -29,6 +30,46 @@ function ProductsContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [feedback, setFeedback] = useState({});
+  const [wishlistSet, setWishlistSet] = useState(new Set());
+
+  useEffect(() => {
+    if (user) {
+      wishlistService.getWishlist()
+        .then((items) => {
+          const ids = new Set(items.map((item) => item.productId));
+          setWishlistSet(ids);
+        })
+        .catch((err) => console.error('Error fetching wishlist state', err));
+    } else {
+      setWishlistSet(new Set());
+    }
+  }, [user]);
+
+  const handleToggleWishlist = async (e, productId) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+
+    const isWishlisted = wishlistSet.has(productId);
+    try {
+      if (isWishlisted) {
+        await wishlistService.removeFromWishlist(productId);
+        setWishlistSet((prev) => {
+          const next = new Set(prev);
+          next.delete(productId);
+          return next;
+        });
+      } else {
+        await wishlistService.addToWishlist(productId);
+        setWishlistSet((prev) => new Set(prev).add(productId));
+      }
+    } catch (err) {
+      console.error('Error toggling wishlist', err);
+    }
+  };
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -251,7 +292,7 @@ function ProductsContent() {
           <div className="product-grid">
             {products.map((product) => (
               <div className="product-card" key={product.id}>
-                <Link href={`/product/${product.id}`} className="product-image-container">
+                <Link href={`/product/${product.id}`} className="product-image-container" style={{ position: 'relative' }}>
                   {product.imageUrl ? (
                     <img 
                       src={product.imageUrl} 
@@ -262,6 +303,31 @@ function ProductsContent() {
                   ) : (
                     <span>No Image Available</span>
                   )}
+                  <button
+                    onClick={(e) => handleToggleWishlist(e, product.id)}
+                    aria-label={wishlistSet.has(product.id) ? "Remove from Wishlist" : "Add to Wishlist"}
+                    style={{
+                      position: 'absolute',
+                      top: '10px',
+                      right: '10px',
+                      background: 'rgba(15, 23, 42, 0.75)',
+                      border: '1px solid rgba(255, 255, 255, 0.15)',
+                      borderRadius: '50%',
+                      width: '34px',
+                      height: '34px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      fontSize: '1.1rem',
+                      color: wishlistSet.has(product.id) ? '#ef4444' : '#94a3b8',
+                      backdropFilter: 'blur(4px)',
+                      transition: 'all 0.2s ease',
+                      zIndex: 2,
+                    }}
+                  >
+                    {wishlistSet.has(product.id) ? '♥' : '♡'}
+                  </button>
                 </Link>
                 <div className="product-info">
                   <span className="product-category">{product.category}</span>

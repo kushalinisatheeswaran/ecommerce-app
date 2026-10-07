@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { productService } from '../../../services/productService';
 import { cartService } from '../../../services/cartService';
+import { wishlistService } from '../../../services/wishlistService';
 import { useAuth } from '../../../context/AuthContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -17,6 +18,7 @@ export default function ProductDetailPage({ params }) {
   const [quantity, setQuantity] = useState(1);
   const [feedback, setFeedback] = useState(null);
   const [isAdding, setIsAdding] = useState(false);
+  const [isWishlisted, setIsWishlisted] = useState(false);
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -38,6 +40,33 @@ export default function ProductDetailPage({ params }) {
 
     fetchProduct();
   }, [productId]);
+
+  useEffect(() => {
+    if (user && productId) {
+      wishlistService.checkWishlisted(productId)
+        .then((res) => setIsWishlisted(res))
+        .catch(() => setIsWishlisted(false));
+    }
+  }, [user, productId]);
+
+  const handleToggleWishlist = async () => {
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+
+    try {
+      if (isWishlisted) {
+        await wishlistService.removeFromWishlist(productId);
+        setIsWishlisted(false);
+      } else {
+        await wishlistService.addToWishlist(productId);
+        setIsWishlisted(true);
+      }
+    } catch (err) {
+      console.error('Error toggling wishlist on detail page', err);
+    }
+  };
 
   const handleAddToCart = async () => {
     if (!user) {
@@ -170,14 +199,30 @@ export default function ProductDetailPage({ params }) {
               </div>
             )}
 
-            <button 
-              onClick={handleAddToCart} 
-              className="btn btn-primary"
-              style={{ width: '100%', padding: '0.9rem', fontSize: '1.05rem' }}
-              disabled={product.stockQuantity <= 0 || isAdding}
-            >
-              {isAdding ? 'Adding...' : product.stockQuantity <= 0 ? 'Out of Stock' : 'Add to Cart'}
-            </button>
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <button 
+                onClick={handleAddToCart} 
+                className="btn btn-primary"
+                style={{ flex: 1, padding: '0.9rem', fontSize: '1.05rem' }}
+                disabled={product.stockQuantity <= 0 || isAdding}
+              >
+                {isAdding ? 'Adding...' : product.stockQuantity <= 0 ? 'Out of Stock' : 'Add to Cart'}
+              </button>
+              <button
+                onClick={handleToggleWishlist}
+                className="btn btn-outline"
+                aria-label={isWishlisted ? "Remove from Wishlist" : "Add to Wishlist"}
+                style={{
+                  padding: '0.9rem 1.25rem',
+                  fontSize: '1.25rem',
+                  color: isWishlisted ? '#ef4444' : 'var(--text-secondary)',
+                  borderColor: isWishlisted ? 'rgba(239, 68, 68, 0.4)' : 'var(--border-color)',
+                }}
+                title={isWishlisted ? "Remove from Wishlist" : "Add to Wishlist"}
+              >
+                {isWishlisted ? '♥ Saved' : '♡ Save'}
+              </button>
+            </div>
           </div>
         </div>
       </div>

@@ -73,6 +73,52 @@ public class UserService {
                 .map(this::mapToUserResponse);
     }
 
+    public UserResponse updateProfile(Long userId, com.app.ecom.dto.ProfileUpdateRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new com.app.ecom.exception.ResourceNotFoundException("User not found"));
+
+        if (request.getFirstName() != null && !request.getFirstName().isBlank()) {
+            user.setFirstName(request.getFirstName().trim());
+        }
+        if (request.getLastName() != null && !request.getLastName().isBlank()) {
+            user.setLastName(request.getLastName().trim());
+        }
+        if (request.getPhone() != null) {
+            user.setPhone(request.getPhone().trim());
+        }
+
+        if (request.getAddress() != null) {
+            Address address = user.getAddress() != null ? user.getAddress() : new Address();
+            address.setStreet(request.getAddress().getStreet());
+            address.setCity(request.getAddress().getCity());
+            address.setState(request.getAddress().getState());
+            address.setZipcode(request.getAddress().getZipcode());
+            address.setCountry(request.getAddress().getCountry());
+            user.setAddress(address);
+        }
+
+        User saved = userRepository.save(user);
+        return mapToUserResponse(saved);
+    }
+
+    public void changePassword(Long userId, com.app.ecom.dto.ChangePasswordRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new com.app.ecom.exception.ResourceNotFoundException("User not found"));
+
+        if (request.getCurrentPassword() == null || request.getCurrentPassword().isBlank()) {
+            throw new BadRequestException("Current password is required");
+        }
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
+            throw new BadRequestException("Incorrect current password");
+        }
+        if (request.getNewPassword() == null || request.getNewPassword().trim().length() < 6) {
+            throw new BadRequestException("New password must be at least 6 characters long");
+        }
+
+        user.setPassword(passwordEncoder.encode(request.getNewPassword().trim()));
+        userRepository.save(user);
+    }
+
     public boolean updateUser(Long id ,UserRequest updatedUserRequest){
         return userRepository.findById(id).map(existingUser ->{
                 updateUserFromRequest(existingUser,updatedUserRequest);
