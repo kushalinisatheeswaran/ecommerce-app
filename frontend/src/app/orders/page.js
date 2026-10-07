@@ -72,8 +72,8 @@ export default function OrdersPage() {
                       borderRadius: '20px',
                       fontSize: '0.75rem',
                       fontWeight: '700',
-                      backgroundColor: order.status === 'DELIVERED' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(99, 102, 241, 0.15)',
-                      color: order.status === 'DELIVERED' ? 'var(--success-color)' : 'var(--accent-color)',
+                      backgroundColor: order.status === 'DELIVERED' ? 'rgba(16, 185, 129, 0.15)' : (order.status === 'CANCELLED' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(99, 102, 241, 0.15)'),
+                      color: order.status === 'DELIVERED' ? 'var(--success-color)' : (order.status === 'CANCELLED' ? 'var(--danger-color)' : 'var(--accent-color)'),
                       border: '1px solid var(--border-color)'
                     }}>
                       ORDER: {order.status}
@@ -91,6 +91,46 @@ export default function OrdersPage() {
                       PAYMENT: {order.paymentStatus || 'PENDING'}
                     </span>
                   </div>
+                </div>
+
+                {/* Status Progression Bar */}
+                <div style={{ marginBottom: '1.25rem', padding: '1rem', background: '#f8fafc', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                  <div style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--text-secondary)', marginBottom: '0.5rem', textTransform: 'uppercase' }}>Fulfillment Tracker</div>
+                  {order.status === 'CANCELLED' ? (
+                    <div style={{ color: 'var(--danger-color)', fontWeight: '700', fontSize: '0.9rem' }}>
+                      ✖ Order Cancelled
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative' }}>
+                      {['PLACED', 'PROCESSING', 'SHIPPED', 'DELIVERED'].map((step, idx, arr) => {
+                        const statuses = ['PLACED', 'PROCESSING', 'SHIPPED', 'DELIVERED'];
+                        const currentIdx = statuses.indexOf(order.status);
+                        const isDone = idx <= currentIdx;
+                        return (
+                          <div key={step} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, position: 'relative', zIndex: 1 }}>
+                            <div style={{
+                              width: '24px',
+                              height: '24px',
+                              borderRadius: '50%',
+                              backgroundColor: isDone ? 'var(--accent-color)' : '#e2e8f0',
+                              color: isDone ? '#ffffff' : '#64748b',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '0.75rem',
+                              fontWeight: '800',
+                              marginBottom: '0.35rem'
+                            }}>
+                              {isDone ? '✓' : idx + 1}
+                            </div>
+                            <span style={{ fontSize: '0.75rem', fontWeight: isDone ? '700' : '500', color: isDone ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
+                              {step}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
 
                 {/* Items List */}

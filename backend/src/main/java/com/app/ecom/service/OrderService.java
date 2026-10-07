@@ -196,8 +196,137 @@ public class OrderService {
                 .toList();
     }
 
+    public List<OrderResponse> getAllOrdersForAdmin(OrderStatus status, PaymentStatus paymentStatus) {
+        List<Order> orders;
+        if (status != null && paymentStatus != null) {
+            orders = orderRepository.findByStatusAndPaymentStatusOrderByCreatedAtDesc(status, paymentStatus);
+        } else if (status != null) {
+            orders = orderRepository.findByStatusOrderByCreatedAtDesc(status);
+        } else if (paymentStatus != null) {
+            orders = orderRepository.findByPaymentStatusOrderByCreatedAtDesc(paymentStatus);
+        } else {
+            orders = orderRepository.findAllByOrderByCreatedAtDesc();
+        }
+        return orders.stream().map(this::mapToOrderResponse).toList();
+    }
+
+    public OrderResponse getOrderByIdForAdmin(Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new com.app.ecom.exception.ResourceNotFoundException("Order not found with id: " + orderId));
+        return mapToOrderResponse(order);
+    }
+
+    public OrderResponse updateOrderStatusForAdmin(Long orderId, OrderStatus newStatus) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new com.app.ecom.exception.ResourceNotFoundException("Order not found with id: " + orderId));
+
+        OrderStatus currentStatus = order.getStatus();
+        if (currentStatus == newStatus) {
+            return mapToOrderResponse(order);
+        }
+
+        // Validate allowed status transitions
+        if (newStatus == OrderStatus.CANCELLED) {
+            if (currentStatus != OrderStatus.PLACED && currentStatus != OrderStatus.PROCESSING) {
+                throw new BadRequestException("Order cannot be cancelled after shipment or when already in terminal state.");
+            }
+            // Restore inventory safely exactly once
+            for (OrderItem item : order.getItems()) {
+                if (item.getProduct() != null) {
+                    Long productId = item.getProduct().getId();
+                    Product product = productRepository.findByIdForUpdate(productId)
+                            .orElseGet(() -> productRepository.findById(productId).orElse(null));
+                    if (product != null) {
+                        product.setStockQuantity(product.getStockQuantity() + item.getQuantity());
+                        productRepository.save(product);
+                    }
+                }
+            }
+        } else if (currentStatus == OrderStatus.PLACED) {
+            if (newStatus != OrderStatus.PROCESSING && newStatus != OrderStatus.CANCELLED) {
+                throw new BadRequestException("Invalid order status transition from PLACED to " + newStatus);
+            }
+        } else if (currentStatus == OrderStatus.PROCESSING) {
+            if (newStatus != OrderStatus.SHIPPED && newStatus != OrderStatus.CANCELLED) {
+                throw new BadRequestException("Invalid order status transition from PROCESSING to " + newStatus);
+            }
+        } else if (currentStatus == OrderStatus.SHIPPED) {
+            if (newStatus != OrderStatus.DELIVERED) {
+                throw new BadRequestException("Invalid order status transition from SHIPPED to " + newStatus);
+            }
+        } else if (currentStatus == OrderStatus.DELIVERED || currentStatus == OrderStatus.CANCELLED) {
+            throw new BadRequestException("Cannot change status of a terminal order.");
+        } else {
+            throw new BadRequestException("Invalid order status transition.");
+        }
+
+        order.setStatus(newStatus);
+        Order savedOrder = orderRepository.save(order);
+        return mapToOrderResponse(savedOrder);
+    }
+
+    public OrderResponse updatePaymentStatusForAdmin(Long orderId, PaymentStatus newPaymentStatus) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new com.app.ecom.exception.ResourceNotFoundException("Order not found with id: " + orderId));
+
+        order.setPaymentStatus(newPaymentStatus);
+        Order savedOrder = orderRepository.save(order);
+        return mapToOrderResponse(savedOrder);
+    }
+
     private OrderResponse mapToOrderResponse(Order order) {
-        BigDecimal subtotal = order.getSubtotal() != null ? order.getSubtotal() : order.getTotalAmount();
+        List<OrderItemDTO> itemDtos = order.getItems() != null
+                ? order.getItems().stream()
+                        .map(orderItem -> {
+                            String pName = orderItem.getProductName() != null
+                                    ? orderItem.getProductName()
+                                    : (orderItem.getProduct() != null ? orderItem.getProduct().getName() : "Product");
+
+                            BigDecimal storedLineTotal = orderItem.getPrice();
+                            int qty = orderItem.getQuantity();
+
+                            BigDecimal derivedUnitPrice = null;
+                            if (orderItem.getUnitPrice() != null) {
+                                derivedUnitPrice = orderItem.getUnitPrice();
+                            } else if (storedLineTotal != null && qty > 0) {
+                                derivedUnitPrice = storedLineTotal.divide(BigDecimal.valueOf(qty), 2, java.math.RoundingMode.HALF_UP);
+                            } else if (orderItem.getProduct() != null && orderItem.getProduct().getPrice() != null) {
+                                derivedUnitPrice = orderItem.getProduct().getPrice();
+                            } else {
+                                derivedUnitPrice = BigDecimal.ZERO;
+                            }
+
+                            BigDecimal finalLineTotal = storedLineTotal != null
+                                    ? storedLineTotal
+                                    : derivedUnitPrice.multiply(BigDecimal.valueOf(qty));
+
+                            return new OrderItemDTO(
+                                    orderItem.getId(),
+                                    orderItem.getProduct() != null ? orderItem.getProduct().getId() : null,
+                                    pName,
+                                    qty,
+                                    derivedUnitPrice,
+                                    finalLineTotal
+                            );
+                        })
+                        .toList()
+                : List.of();
+
+        BigDecimal totalAmount = order.getTotalAmount() != null ? order.getTotalAmount() : BigDecimal.ZERO;
+
+        BigDecimal subtotal;
+        if (order.getSubtotal() != null) {
+            subtotal = order.getSubtotal();
+        } else if (!itemDtos.isEmpty()) {
+            subtotal = itemDtos.stream()
+                    .map(OrderItemDTO::getLineTotal)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+        } else if (order.getTotalAmount() != null) {
+            subtotal = order.getTotalAmount();
+        } else {
+            subtotal = BigDecimal.ZERO;
+        }
+
         BigDecimal discount = order.getDiscountAmount() != null ? order.getDiscountAmount() : BigDecimal.ZERO;
         BigDecimal delivery = order.getDeliveryFee() != null ? order.getDeliveryFee() : BigDecimal.ZERO;
         BigDecimal cod = order.getCodFee() != null ? order.getCodFee() : BigDecimal.ZERO;
@@ -224,13 +353,15 @@ public class OrderService {
             country = userAddr.getCountry();
         }
 
+        String customerEmail = order.getUser() != null ? order.getUser().getEmail() : null;
+
         return new OrderResponse(
                 order.getId(),
                 subtotal,
                 discount,
                 delivery,
                 cod,
-                order.getTotalAmount(),
+                totalAmount,
                 order.getStatus(),
                 order.getPaymentMethod() != null ? order.getPaymentMethod() : PaymentMethod.CASH_ON_DELIVERY,
                 order.getPaymentStatus() != null ? order.getPaymentStatus() : PaymentStatus.PENDING,
@@ -242,22 +373,9 @@ public class OrderService {
                 state,
                 zipcode,
                 country,
-                order.getItems().stream()
-                        .map(orderItem -> {
-                            String pName = orderItem.getProductName() != null ? orderItem.getProductName() : (orderItem.getProduct() != null ? orderItem.getProduct().getName() : "Product");
-                            BigDecimal unitPrice = orderItem.getUnitPrice() != null ? orderItem.getUnitPrice() : (orderItem.getProduct() != null ? orderItem.getProduct().getPrice() : BigDecimal.ZERO);
-                            BigDecimal lineTotal = orderItem.getPrice() != null ? orderItem.getPrice() : unitPrice.multiply(BigDecimal.valueOf(orderItem.getQuantity()));
-                            return new OrderItemDTO(
-                                    orderItem.getId(),
-                                    orderItem.getProduct() != null ? orderItem.getProduct().getId() : null,
-                                    pName,
-                                    orderItem.getQuantity(),
-                                    unitPrice,
-                                    lineTotal
-                            );
-                        })
-                        .toList(),
-                order.getCreatedAt()
+                itemDtos,
+                order.getCreatedAt(),
+                customerEmail
         );
     }
 }

@@ -4,6 +4,7 @@ import com.app.ecom.model.Product;
 import com.app.ecom.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -15,9 +16,12 @@ import java.util.List;
 public class DataInitializer implements CommandLineRunner {
 
     private final ProductRepository productRepository;
+    private final JdbcTemplate jdbcTemplate;
 
     @Override
     public void run(String... args) throws Exception {
+        fixDatabaseCheckConstraints();
+
         if (productRepository.count() == 0) {
             List<Product> products = Arrays.asList(
                 // Category: Smartphones (5 products)
@@ -167,6 +171,21 @@ public class DataInitializer implements CommandLineRunner {
 
             productRepository.saveAll(products);
             System.out.println(">> Database seeded successfully with 100 products!");
+        }
+    }
+
+    private void fixDatabaseCheckConstraints() {
+        try {
+            jdbcTemplate.execute("ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_status_check");
+            jdbcTemplate.execute("ALTER TABLE orders ADD CONSTRAINT orders_status_check CHECK (status IN ('PLACED', 'PROCESSING', 'PENDING', 'CONFIRMED', 'SHIPPED', 'DELIVERED', 'CANCELLED'))");
+            
+            jdbcTemplate.execute("ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_payment_status_check");
+            jdbcTemplate.execute("ALTER TABLE orders ADD CONSTRAINT orders_payment_status_check CHECK (payment_status IN ('PENDING', 'PAID_TEST', 'FAILED'))");
+            
+            jdbcTemplate.execute("ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_payment_method_check");
+            jdbcTemplate.execute("ALTER TABLE orders ADD CONSTRAINT orders_payment_method_check CHECK (payment_method IN ('CASH_ON_DELIVERY', 'CARD'))");
+        } catch (Exception e) {
+            System.err.println("Note on constraint update: " + e.getMessage());
         }
     }
 

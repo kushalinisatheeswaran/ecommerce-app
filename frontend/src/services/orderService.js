@@ -15,4 +15,24 @@ export const orderService = {
     const response = await api.get('/api/users/me');
     return response.data;
   },
+
+  getAllAdminOrders: async (params = {}) => {
+    const response = await api.get('/api/admin/orders', { params });
+    return response.data;
+  },
+
+  getAdminOrderById: async (id) => {
+    const response = await api.get(`/api/admin/orders/${id}`);
+    return response.data;
+  },
+
+  updateOrderStatus: async (id, status) => {
+    const response = await api.patch(`/api/admin/orders/${id}/status`, { status });
+    return response.data;
+  },
+
+  updatePaymentStatus: async (id, paymentStatus) => {
+    const response = await api.patch(`/api/admin/orders/${id}/payment-status`, { paymentStatus });
+    return response.data;
+  },
 };

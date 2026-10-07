@@ -36,4 +36,5 @@ public class OrderResponse {
 
     private List<OrderItemDTO> items;
     private LocalDateTime createdAt;
+    private String customerEmail;
 }
