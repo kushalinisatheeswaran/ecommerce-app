@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { productService } from '../services/productService';
 import { cartService } from '../services/cartService';
@@ -19,55 +19,8 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [feedback, setFeedback] = useState({});
 
-  const heroRef = useRef(null);
-  const rafIdRef = useRef(null);
-
-  const handleMouseMove = (e) => {
-    if (!heroRef.current) return;
-
-    // Respect reduced motion & touch devices
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || window.matchMedia('(pointer: coarse)').matches) {
-      return;
-    }
-
-    const rect = heroRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    // Normalized from -1 to +1
-    const normX = ((x / rect.width) * 2 - 1);
-    const normY = ((y / rect.height) * 2 - 1);
-
-    if (rafIdRef.current) {
-      cancelAnimationFrame(rafIdRef.current);
-    }
-
-    rafIdRef.current = requestAnimationFrame(() => {
-      if (!heroRef.current) return;
-      heroRef.current.style.setProperty('--mouse-x', `${(x / rect.width) * 100}%`);
-      heroRef.current.style.setProperty('--mouse-y', `${(y / rect.height) * 100}%`);
-      heroRef.current.style.setProperty('--norm-x', normX.toFixed(3));
-      heroRef.current.style.setProperty('--norm-y', normY.toFixed(3));
-      heroRef.current.style.setProperty('--glow-opacity', '1');
-    });
-  };
-
-  const handleMouseLeave = () => {
-    if (!heroRef.current) return;
-    if (rafIdRef.current) {
-      cancelAnimationFrame(rafIdRef.current);
-    }
-    rafIdRef.current = requestAnimationFrame(() => {
-      if (!heroRef.current) return;
-      heroRef.current.style.setProperty('--norm-x', '0');
-      heroRef.current.style.setProperty('--norm-y', '0');
-      heroRef.current.style.setProperty('--mouse-x', '50%');
-      heroRef.current.style.setProperty('--mouse-y', '50%');
-      heroRef.current.style.setProperty('--glow-opacity', '0.7');
-    });
-  };
-
   useEffect(() => {
+    let isMounted = true;
     const fetchHomeData = async () => {
       setLoading(true);
       try {
@@ -75,23 +28,26 @@ export default function HomePage() {
           productService.getProducts({ sort: 'createdAt,desc', page: 0, size: 4 }),
           productService.getProducts({ sort: 'price,desc', page: 0, size: 4 }),
           productService.getProducts({ category: 'Beauty & Personal Care', page: 0, size: 4 }),
-          productService.getProducts({ category: 'Fashion (Men/Women)', page: 0, size: 4 }),
+          productService.getProducts({ category: 'Fashion', page: 0, size: 4 }),
           productService.getProducts({ category: 'Smartphones', page: 0, size: 4 }),
         ]);
 
-        setNewArrivals(newRes.content || []);
-        setExploreProducts(exploreRes.content || []);
-        setBeautyProducts(beautyRes.content || []);
-        setFashionProducts(fashionRes.content || []);
-        setElectronicsProducts(elecRes.content || []);
+        if (isMounted) {
+          setNewArrivals(newRes?.content || []);
+          setExploreProducts(exploreRes?.content || []);
+          setBeautyProducts(beautyRes?.content || []);
+          setFashionProducts(fashionRes?.content || []);
+          setElectronicsProducts(elecRes?.content || []);
+        }
       } catch (err) {
-        console.error('Error loading homepage catalog sections', err);
+        console.error('Error loading homepage catalog data', err);
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
 
     fetchHomeData();
+    return () => { isMounted = false; };
   }, []);
 
   const handleAddToCart = async (productId) => {
@@ -101,7 +57,7 @@ export default function HomePage() {
     }
     try {
       await cartService.addToCart(productId, 1);
-      setFeedback((prev) => ({ ...prev, [productId]: { status: 'success', message: 'Added!' } }));
+      setFeedback((prev) => ({ ...prev, [productId]: { status: 'success', message: 'Added to cart' } }));
       setTimeout(() => {
         setFeedback((prev) => ({ ...prev, [productId]: null }));
       }, 2000);
@@ -116,336 +72,289 @@ export default function HomePage() {
     }
   };
 
-  const curatingCategories = [
-    { title: 'Electronics', icon: '💻', count: 'Laptops, TVs & Accessories', categoryParam: 'Smartphones' },
-    { title: 'Fashion', icon: '👔', count: 'Men, Women & Footwear', categoryParam: 'Fashion (Men/Women)' },
-    { title: 'Beauty & Personal Care', icon: '✨', count: 'Skincare & Wellness', categoryParam: 'Beauty & Personal Care' },
-    { title: 'Home Appliances', icon: '🏠', count: 'Living & Kitchen Gadgets', categoryParam: 'Home Appliances' },
-    { title: 'Gaming', icon: '🎮', count: 'Consoles & Peripherals', categoryParam: 'Gaming' },
-    { title: 'Books', icon: '📚', count: 'Literature & Learning', categoryParam: 'Books' },
+  // Six visual category cards mapped to existing backend categories where available
+  const categoryCards = [
+    {
+      id: 'electronics',
+      title: 'Electronics',
+      subtitle: 'Smartphones, Audio & Tech',
+      href: '/products?category=Smartphones',
+      image: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=800&q=80',
+    },
+    {
+      id: 'fashion',
+      title: 'Fashion',
+      subtitle: 'Contemporary Apparel & Style',
+      href: '/products?category=Fashion',
+      image: 'https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&w=800&q=80',
+    },
+    {
+      id: 'beauty',
+      title: 'Beauty',
+      subtitle: 'Luxury Skincare & Care',
+      href: `/products?category=${encodeURIComponent('Beauty & Personal Care')}`,
+      image: 'https://images.unsplash.com/photo-1556228720-195a672e8a03?auto=format&fit=crop&w=800&q=80',
+    },
+    {
+      id: 'home-appliances',
+      title: 'Home Appliances',
+      subtitle: 'Living & Kitchen Innovations',
+      href: `/products?category=${encodeURIComponent('Home Appliances')}`,
+      image: 'https://images.unsplash.com/photo-1517668808822-9ebb02f2a0e6?auto=format&fit=crop&w=800&q=80',
+    },
+    {
+      id: 'gaming',
+      title: 'Gaming',
+      subtitle: 'Consoles, Gears & Peripherals',
+      href: '/products?category=Gaming',
+      image: 'https://images.unsplash.com/photo-1592840496694-26d035b52b48?auto=format&fit=crop&w=800&q=80',
+    },
+    {
+      id: 'books',
+      title: 'Books',
+      subtitle: 'Curated Literature & Prints',
+      href: '/products?category=Books',
+      image: 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=800&q=80',
+    },
   ];
-
-  const [currentSlide, setCurrentSlide] = useState(0);
-
-  const heroSlides = React.useMemo(() => {
-    return [...exploreProducts, ...newArrivals]
-      .filter((p, index, self) => p && p.imageUrl && self.findIndex((x) => x.id === p.id) === index)
-      .slice(0, 5);
-  }, [exploreProducts, newArrivals]);
-
-  useEffect(() => {
-    if (heroSlides.length <= 1) return;
-    const interval = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % heroSlides.length);
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [heroSlides]);
 
   const renderProductRow = (productsList) => (
     <div className="product-grid">
       {productsList.map((product) => (
-        <div className="product-card" key={product.id}>
+        <article className="product-card" key={product.id}>
           <Link href={`/product/${product.id}`} className="product-image-container">
             {product.imageUrl ? (
-              <img 
-                src={product.imageUrl} 
-                alt={product.name} 
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                onError={(e) => { e.target.style.display = 'none'; }}
+              <img
+                src={product.imageUrl}
+                alt={product.name}
+                className="product-card-img"
+                loading="lazy"
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                }}
               />
             ) : (
-              <span>No Image Available</span>
+              <span className="product-no-img">No Image Available</span>
             )}
+            <span className="product-category-badge">{product.category}</span>
           </Link>
+
           <div className="product-info">
-            <span className="product-category">{product.category}</span>
-            <Link href={`/product/${product.id}`} className="product-name">
+            <Link href={`/product/${product.id}`} className="product-name" title={product.name}>
               {product.name}
             </Link>
             <p className="product-desc">{product.description}</p>
-            
+
             {feedback[product.id] && (
-              <div style={{ 
-                fontSize: '0.8rem', 
-                color: feedback[product.id].status === 'success' ? 'var(--success-color)' : 'var(--danger-color)',
-                marginBottom: '0.5rem',
-                backgroundColor: feedback[product.id].status === 'success' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                padding: '0.4rem',
-                borderRadius: '4px'
-              }}>
+              <div
+                className={`product-feedback ${feedback[product.id].status === 'success' ? 'feedback-success' : 'feedback-error'
+                  }`}
+                role="status"
+              >
                 {feedback[product.id].message}
               </div>
             )}
 
             <div className="product-footer">
-              <span className="product-price">${product.price.toFixed(2)}</span>
-              <button 
-                onClick={() => handleAddToCart(product.id)} 
-                className="btn btn-primary"
-                style={{ padding: '0.4rem 0.85rem', fontSize: '0.85rem' }}
+              <div className="product-price-wrapper">
+                <span className="product-price-currency">$</span>
+                <span className="product-price">{product.price.toFixed(2)}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleAddToCart(product.id)}
+                className="btn btn-primary product-add-btn"
                 disabled={product.stockQuantity <= 0}
+                aria-label={`Add ${product.name} to cart`}
               >
                 {product.stockQuantity <= 0 ? 'Out of Stock' : 'Add to Cart'}
               </button>
             </div>
           </div>
-        </div>
+        </article>
       ))}
     </div>
   );
 
   return (
-    <div>
-      {/* 1. IMMERSIVE CINEMATIC ADVERTISING HERO */}
-      <div className="hero-fluid-outer-wrapper">
-        <section 
-          ref={heroRef}
-          className="cinematic-hero-section"
-          onMouseMove={handleMouseMove}
-          onMouseLeave={handleMouseLeave}
-        >
-          {/* Layer 1: Dark Premium Radial/Glow Background */}
-          <div className="hero-bg-base" />
+    <div className="home-page-container">
+      {/* 1. HERO BANNER */}
+      <section className="hero-banner-section" aria-label="Featured Showcase">
+        <div className="hero-banner-card">
+          {/* Subtle Ambient Lighting Gradients */}
+          <div className="hero-ambient-glow hero-glow-violet" aria-hidden="true" />
+          <div className="hero-ambient-glow hero-glow-cyan" aria-hidden="true" />
 
-          {/* Dynamic Slide-Specific Accent Glow */}
-          {heroSlides.map((prod, idx) => {
-            const categoryGlowClass = 
-              prod?.category?.toLowerCase().includes('electronics') ? 'glow-blue' :
-              prod?.category?.toLowerCase().includes('beauty') ? 'glow-pink' :
-              prod?.category?.toLowerCase().includes('fashion') ? 'glow-amber' :
-              prod?.category?.toLowerCase().includes('gaming') ? 'glow-purple' : 'glow-indigo';
-
-            return (
-              <div 
-                key={`glow-${prod?.id || idx}`}
-                className={`hero-accent-glow ${categoryGlowClass} ${idx === currentSlide ? 'active' : ''}`} 
-              />
-            );
-          })}
-
-          {/* Layer 2: Oversized Background Typography (Behind Product) */}
-          <div className="hero-typography-layer" aria-hidden="true">
-            {heroSlides.map((prod, idx) => {
-              let bgWord = 'DISCOVER';
-              const cat = prod?.category?.toLowerCase() || '';
-              if (cat.includes('electronics')) bgWord = 'TECH';
-              else if (cat.includes('beauty')) bgWord = 'BEAUTY';
-              else if (cat.includes('fashion')) bgWord = 'STYLE';
-              else if (cat.includes('gaming')) bgWord = 'PLAY';
-              else if (cat.includes('book')) bgWord = 'CREATE';
-
-              return (
-                <div
-                  key={`bgtext-${prod?.id || idx}`}
-                  className={`hero-bg-word ${idx === currentSlide ? 'active' : ''}`}
-                >
-                  {bgWord}
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Layer 3: Layered Product & Information Stage */}
-          <div className="hero-cinematic-stage">
-            {/* Left Content / Info & CTA */}
-            <div className="hero-stage-content">
-              {heroSlides[currentSlide] && (
-                <span className="hero-category-tag">
-                  ✨ {heroSlides[currentSlide].category || 'Featured Collection'}
-                </span>
-              )}
-              <h1 className="hero-headline">
-                {currentSlide === 0 && 'Next-Gen Technology & Lifestyle.'}
-                {currentSlide === 1 && 'Elevate Your Everyday Style.'}
-                {currentSlide === 2 && 'Pure Radiance & Luxury Care.'}
-                {currentSlide === 3 && 'Unmatched Performance & Play.'}
-                {currentSlide >= 4 && 'Explore Premium Catalog Arrivals.'}
+          <div className="hero-content-grid">
+            {/* Left Content */}
+            <div className="hero-left-content">
+              <div className="hero-pill-tag">
+                <span className="hero-pill-dot" />
+                <span>Next Generation Storefront</span>
+              </div>
+              <h1 className="hero-heading">
+                Experience the Future of Shopping.
               </h1>
-              <p className="hero-description">
-                Experience curated craftsmanship, cutting-edge innovations, and exclusive prices delivered right to your doorstep.
+              <p className="hero-subtitle">
+                Discover thoughtfully selected products across technology, fashion, beauty, and everyday essentials. Find something you&apos;ll love.
               </p>
-
-              <div className="hero-cta-group">
-                <Link href="/products" className="btn btn-primary hero-btn-primary">
-                  Shop Now
+              <div className="hero-action-row">
+                <Link href="/products" className="btn btn-primary hero-cta-btn">
+                  <span>Shop Now</span>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                    <polyline points="12 5 19 12 12 19" />
+                  </svg>
                 </Link>
-                <a href="#categories" className="btn btn-outline hero-btn-outline">
-                  Browse Categories
+                <a href="#categories" className="btn btn-outline hero-secondary-btn">
+                  Explore Categories
                 </a>
               </div>
-
-              {/* Active Product Details & Direct Link */}
-              {heroSlides[currentSlide] && (
-                <div className="hero-featured-card-link">
-                  <Link href={`/product/${heroSlides[currentSlide].id}`} className="hero-featured-link-box">
-                    <div className="hero-featured-info">
-                      <span className="hero-featured-name">{heroSlides[currentSlide].name}</span>
-                      <span className="hero-featured-price">${heroSlides[currentSlide].price?.toFixed(2)}</span>
-                    </div>
-                    <span className="hero-featured-arrow">→</span>
-                  </Link>
-                </div>
-              )}
             </div>
 
-            {/* Right Visual: Dominant Layered Product Image (Layer 4 - In Front of Text) */}
-            <div className="hero-stage-visual">
-              {heroSlides.map((prod, idx) => (
-                <div
-                  key={`prod-visual-${prod.id}`}
-                  className={`hero-product-image-wrapper ${idx === currentSlide ? 'active' : ''}`}
-                >
-                  {prod.imageUrl ? (
-                    <img
-                      src={prod.imageUrl}
-                      alt={prod.name}
-                      className="hero-product-dominant-img"
-                      onError={(e) => { e.target.style.display = 'none'; }}
-                    />
-                  ) : (
-                    <div className="hero-product-fallback">
-                      <span>{prod.name}</span>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Dots Navigation */}
-          {heroSlides.length > 1 && (
-            <div className="hero-slideshow-dots">
-              {heroSlides.map((_, idx) => (
-                <button
-                  key={idx}
-                  className={`hero-dot ${idx === currentSlide ? 'active' : ''}`}
-                  onClick={() => setCurrentSlide(idx)}
-                  aria-label={`Go to slide ${idx + 1}`}
+            {/* Right Product Showcase (Wireless Headphones Visual) */}
+            <div className="hero-right-showcase" aria-hidden="true">
+              <div className="hero-showcase-backdrop">
+                <div className="hero-showcase-halo" />
+                <img
+                  src="https://plus.unsplash.com/premium_photo-1679513691474-73102089c117?auto=format&fit=crop&w=1000&q=80"
+                  alt="Premium Wireless Headphones"
+                  className="hero-headphones-img"
+                  loading="eager"
                 />
-              ))}
+                <div className="hero-showcase-chip">
+                  <span className="hero-chip-brand">FLAGSHIP AUDIO</span>
+                  <span className="hero-chip-desc">Acoustic Clarity & ANC</span>
+                </div>
+              </div>
             </div>
-          )}
-        </section>
-      </div>
-
-      <div style={{ maxWidth: '1240px', margin: '0 auto', padding: '0 1.5rem' }}>
-
-      {/* 2. SHOP BY CATEGORY */}
-      <section id="categories" style={{ marginBottom: '4rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '1.75rem' }}>
-          <h2 style={{ fontSize: '1.8rem', fontWeight: '800' }}>Shop by Category</h2>
-          <Link href="/products" style={{ color: 'var(--accent-color)', fontWeight: '600', fontSize: '0.95rem' }}>
-            View Catalog →
-          </Link>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1.25rem' }}>
-          {curatingCategories.map((cat) => (
-            <Link 
-              key={cat.title} 
-              href={`/products?category=${encodeURIComponent(cat.categoryParam || cat.title)}`}
-              style={{
-                background: 'var(--bg-secondary)',
-                border: '1px solid var(--border-color)',
-                borderRadius: '14px',
-                padding: '1.5rem 1.25rem',
-                textDecoration: 'none',
-                color: 'inherit',
-                transition: 'all 0.2s ease',
-                boxShadow: 'var(--shadow-sm)'
-              }}
-            >
-              <div style={{ fontSize: '2.2rem', marginBottom: '0.75rem' }}>{cat.icon}</div>
-              <h3 style={{ fontSize: '1.05rem', fontWeight: '700', marginBottom: '0.25rem' }}>{cat.title}</h3>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{cat.count}</p>
-            </Link>
-          ))}
+          </div>
         </div>
       </section>
 
-      {/* 3. NEW ARRIVALS */}
-      {newArrivals.length > 0 && (
-        <section style={{ marginBottom: '4rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '1.5rem' }}>
+      {/* MAIN CONTENT WRAPPER */}
+      <div className="content-container">
+        {/* 2. SHOP BY CATEGORY - EXACTLY SIX CARDS (3x2 GRID) */}
+        <section id="categories" className="section-block category-showcase-section" aria-labelledby="category-heading">
+          <div className="section-header">
             <div>
-              <h2 style={{ fontSize: '1.8rem', fontWeight: '800' }}>New Arrivals</h2>
-              <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Recently added products in store</p>
+              <span className="section-eyebrow">Curated Collections</span>
+              <h2 id="category-heading" className="section-title">Shop by Category</h2>
             </div>
-            <Link href="/products?sort=createdAt,desc" style={{ color: 'var(--accent-color)', fontWeight: '600', fontSize: '0.95rem' }}>
-              View All →
+            <Link href="/products" className="section-link">
+              View All Products <span aria-hidden="true">&rarr;</span>
             </Link>
           </div>
-          {renderProductRow(newArrivals)}
-        </section>
-      )}
 
-      {/* 4. POPULAR PICKS / EXPLORE */}
-      {exploreProducts.length > 0 && (
-        <section style={{ marginBottom: '4rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '1.5rem' }}>
-            <div>
-              <h2 style={{ fontSize: '1.8rem', fontWeight: '800' }}>Explore Recommended Picks</h2>
-              <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Top items selected from our active catalog</p>
+          <div className="category-grid-3x2">
+            {categoryCards.map((cat) => (
+              <Link
+                key={cat.id}
+                href={cat.href}
+                className="category-card"
+                aria-label={`Browse ${cat.title} category`}
+              >
+                {/* Background Image with Dark Contrast Overlay */}
+                <div
+                  className="category-card-bg"
+                  style={{ backgroundImage: `url(${cat.image})` }}
+                  role="img"
+                  aria-label={cat.title}
+                />
+                <div className="category-card-overlay" />
+
+                {/* Frosted Glass Pill Label */}
+                <div className="category-card-label">
+                  <div className="category-label-text-group">
+                    <h3 className="category-card-title">{cat.title}</h3>
+                    <p className="category-card-subtitle">{cat.subtitle}</p>
+                  </div>
+                  <span className="category-explore-badge">
+                    Explore <span aria-hidden="true">&rarr;</span>
+                  </span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        {/* 3. NEW ARRIVALS */}
+        {newArrivals.length > 0 && (
+          <section className="section-block" aria-labelledby="new-arrivals-heading">
+            <div className="section-header">
+              <div>
+                <span className="section-eyebrow">Fresh in Store</span>
+                <h2 id="new-arrivals-heading" className="section-title">New Arrivals</h2>
+              </div>
+              <Link href="/products?sort=createdAt,desc" className="section-link">
+                View All <span aria-hidden="true">&rarr;</span>
+              </Link>
             </div>
-            <Link href="/products" style={{ color: 'var(--accent-color)', fontWeight: '600', fontSize: '0.95rem' }}>
-              Browse All →
+            {renderProductRow(newArrivals)}
+          </section>
+        )}
+
+        {/* 4. EXPLORE RECOMMENDED PICKS */}
+        {exploreProducts.length > 0 && (
+          <section className="section-block" aria-labelledby="explore-picks-heading">
+            <div className="section-header">
+              <div>
+                <span className="section-eyebrow">Handpicked for You</span>
+                <h2 id="explore-picks-heading" className="section-title">Explore Recommended Picks</h2>
+              </div>
+              <Link href="/products" className="section-link">
+                Browse All <span aria-hidden="true">&rarr;</span>
+              </Link>
+            </div>
+            {renderProductRow(exploreProducts)}
+          </section>
+        )}
+
+        {/* 5. BEAUTY & CARE */}
+        {beautyProducts.length > 0 && (
+          <section className="section-block" aria-labelledby="beauty-heading">
+            <div className="section-header">
+              <div>
+                <span className="section-eyebrow">Self-Care & Wellness</span>
+                <h2 id="beauty-heading" className="section-title">Beauty & Personal Care</h2>
+              </div>
+              <Link href={`/products?category=${encodeURIComponent('Beauty & Personal Care')}`} className="section-link">
+                View Category <span aria-hidden="true">&rarr;</span>
+              </Link>
+            </div>
+            {renderProductRow(beautyProducts)}
+          </section>
+        )}
+
+        {/* 6. FASHION ESSENTIALS */}
+        {fashionProducts.length > 0 && (
+          <section className="section-block" aria-labelledby="fashion-heading">
+            <div className="section-header">
+              <div>
+                <span className="section-eyebrow">Wardrobe Classics</span>
+                <h2 id="fashion-heading" className="section-title">Fashion Essentials</h2>
+              </div>
+              <Link href="/products?category=Fashion" className="section-link">
+                View Category <span aria-hidden="true">&rarr;</span>
+              </Link>
+            </div>
+            {renderProductRow(fashionProducts)}
+          </section>
+        )}
+
+        {/* 7. BOTTOM CALL TO ACTION */}
+        <section className="cta-banner-section" aria-labelledby="cta-heading">
+          <div className="cta-ambient-glow" aria-hidden="true" />
+          <div className="cta-content">
+            <h2 id="cta-heading" className="cta-heading">Looking for something specific?</h2>
+            <p className="cta-description">
+              Use our catalog filters, real-time search, and price sorting to discover exact items across all departments.
+            </p>
+            <Link href="/products" className="btn btn-primary cta-btn">
+              Explore Full Catalog
             </Link>
           </div>
-          {renderProductRow(exploreProducts)}
         </section>
-      )}
-
-      {/* 5. BEAUTY & CARE */}
-      {beautyProducts.length > 0 && (
-        <section style={{ marginBottom: '4rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '1.5rem' }}>
-            <div>
-              <h2 style={{ fontSize: '1.8rem', fontWeight: '800' }}>Beauty & Personal Care</h2>
-              <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Self care & wellness products</p>
-            </div>
-            <Link href={`/products?category=${encodeURIComponent('Beauty & Personal Care')}`} style={{ color: 'var(--accent-color)', fontWeight: '600', fontSize: '0.95rem' }}>
-              View Category →
-            </Link>
-          </div>
-          {renderProductRow(beautyProducts)}
-        </section>
-      )}
-
-      {/* 6. FASHION */}
-      {fashionProducts.length > 0 && (
-        <section style={{ marginBottom: '4rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '1.5rem' }}>
-            <div>
-              <h2 style={{ fontSize: '1.8rem', fontWeight: '800' }}>Fashion Essentials</h2>
-              <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Modern clothing and apparel</p>
-            </div>
-            <Link href={`/products?category=${encodeURIComponent('Fashion (Men/Women)')}`} style={{ color: 'var(--accent-color)', fontWeight: '600', fontSize: '0.95rem' }}>
-              View Category →
-            </Link>
-          </div>
-          {renderProductRow(fashionProducts)}
-        </section>
-      )}
-
-      {/* CTA SECTION */}
-      <section style={{
-        background: 'var(--bg-secondary)',
-        border: '1px solid var(--border-color)',
-        borderRadius: '16px',
-        padding: '3rem',
-        textAlign: 'center',
-        marginBottom: '4rem',
-        boxShadow: 'var(--shadow-sm)'
-      }}>
-        <h2 style={{ fontSize: '2rem', fontWeight: '800', marginBottom: '0.75rem' }}>Looking for something specific?</h2>
-        <p style={{ color: 'var(--text-secondary)', maxWidth: '600px', margin: '0 auto 1.5rem auto' }}>
-          Use our advanced search, category filters, and price ranges to find exact products in our store catalog.
-        </p>
-        <Link href="/products" className="btn btn-primary" style={{ padding: '0.85rem 2rem', fontSize: '1rem' }}>
-          Explore Full Catalog
-        </Link>
-      </section>
-
       </div>
     </div>
   );
